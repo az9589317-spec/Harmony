@@ -2,6 +2,7 @@
 
 import type { Song } from '@/lib/types';
 import { useMusicPlayer } from '@/contexts/MusicPlayerContext';
+import { useState } from 'react';
 import {
   Table,
   TableBody,
@@ -20,7 +21,9 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { AlbumArt } from './AlbumArt';
-import { Clock, MoreHorizontal, Music, Plus, Play } from 'lucide-react';
+import { Clock, MoreHorizontal, Music, Plus, Play, Pencil } from 'lucide-react';
+import { EditSongDialog } from './EditSongDialog';
+import { useUser } from '@/firebase';
 
 interface SongListProps {
   songs: Song[];
@@ -36,6 +39,13 @@ function formatDuration(seconds: number) {
 
 export function SongList({ songs, playlistId }: SongListProps) {
   const { playTrack, playlists, addSongToPlaylist, currentTrack } = useMusicPlayer();
+  const { user } = useUser();
+  const [songToEdit, setSongToEdit] = useState<Song | null>(null);
+
+  const handleEdit = (song: Song, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSongToEdit(song);
+  };
 
   if (songs.length === 0) {
     return (
@@ -48,71 +58,86 @@ export function SongList({ songs, playlistId }: SongListProps) {
   }
   
   return (
-    <div className="p-2 md:p-6">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-12"></TableHead>
-            <TableHead>Title</TableHead>
-            <TableHead>Artist</TableHead>
-            <TableHead>Genre</TableHead>
-            <TableHead className="text-right w-24">
-              <Clock className="inline-block w-4 h-4" />
-            </TableHead>
-            <TableHead className="w-12"></TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {songs.map((song, index) => (
-            <TableRow 
-                key={song.id} 
-                className="group cursor-pointer"
-                data-state={currentTrack?.id === song.id ? 'selected' : undefined}
-                onClick={() => playTrack(index, playlistId)}
-            >
-              <TableCell>
-                <div className="relative">
-                  <AlbumArt src={song.albumArtUrl} alt={song.title} className="w-10 h-10" />
-                  <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Play className="w-5 h-5 text-white" fill="white"/>
-                  </div>
-                </div>
-              </TableCell>
-              <TableCell className="font-medium">{song.title}</TableCell>
-              <TableCell className="text-muted-foreground">{song.artist}</TableCell>
-              <TableCell className="text-muted-foreground capitalize">{song.genre}</TableCell>
-              <TableCell className="text-right text-muted-foreground">
-                {formatDuration(song.duration)}
-              </TableCell>
-              <TableCell onClick={(e) => e.stopPropagation()}>
-                <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <button className="p-2 opacity-0 group-hover:opacity-100 focus:opacity-100 rounded-full hover:bg-secondary">
-                            <MoreHorizontal className="w-4 h-4"/>
-                            <span className="sr-only">More options</span>
-                        </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                        <DropdownMenuSub>
-                            <DropdownMenuSubTrigger>
-                                <Plus className="mr-2 h-4 w-4"/>
-                                Add to playlist
-                            </DropdownMenuSubTrigger>
-                            <DropdownMenuSubContent>
-                                {playlists.filter(p => p.id !== 'library').map(p => (
-                                    <DropdownMenuItem key={p.id} onClick={() => addSongToPlaylist(song.id, p.id)}>
-                                        {p.name}
-                                    </DropdownMenuItem>
-                                ))}
-                            </DropdownMenuSubContent>
-                        </DropdownMenuSub>
-                    </DropdownMenuContent>
-                </DropdownMenu>
-              </TableCell>
+    <>
+      <div className="p-2 md:p-6">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-12"></TableHead>
+              <TableHead>Title</TableHead>
+              <TableHead>Artist</TableHead>
+              <TableHead>Genre</TableHead>
+              <TableHead className="text-right w-24">
+                <Clock className="inline-block w-4 h-4" />
+              </TableHead>
+              <TableHead className="w-12"></TableHead>
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
+          </TableHeader>
+          <TableBody>
+            {songs.map((song, index) => (
+              <TableRow 
+                  key={song.id} 
+                  className="group cursor-pointer"
+                  data-state={currentTrack?.id === song.id ? 'selected' : undefined}
+                  onClick={() => playTrack(index, playlistId)}
+              >
+                <TableCell>
+                  <div className="relative">
+                    <AlbumArt src={song.albumArtUrl} alt={song.title} className="w-10 h-10" />
+                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Play className="w-5 h-5 text-white" fill="white"/>
+                    </div>
+                  </div>
+                </TableCell>
+                <TableCell className="font-medium">{song.title}</TableCell>
+                <TableCell className="text-muted-foreground">{song.artist}</TableCell>
+                <TableCell className="text-muted-foreground capitalize">{song.genre}</TableCell>
+                <TableCell className="text-right text-muted-foreground">
+                  {formatDuration(song.duration)}
+                </TableCell>
+                <TableCell onClick={(e) => e.stopPropagation()}>
+                  <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                          <button className="p-2 opacity-0 group-hover:opacity-100 focus:opacity-100 rounded-full hover:bg-secondary">
+                              <MoreHorizontal className="w-4 h-4"/>
+                              <span className="sr-only">More options</span>
+                          </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                          <DropdownMenuSub>
+                              <DropdownMenuSubTrigger>
+                                  <Plus className="mr-2 h-4 w-4"/>
+                                  Add to playlist
+                              </DropdownMenuSubTrigger>
+                              <DropdownMenuSubContent>
+                                  {playlists.filter(p => p.id !== 'library').map(p => (
+                                      <DropdownMenuItem key={p.id} onClick={() => addSongToPlaylist(song.id, p.id)}>
+                                          {p.name}
+                                      </DropdownMenuItem>
+                                  ))}
+                              </DropdownMenuSubContent>
+                          </DropdownMenuSub>
+                          {user && user.uid === song.userId && (
+                            <DropdownMenuItem onClick={(e) => handleEdit(song, e)}>
+                                <Pencil className="mr-2 h-4 w-4"/>
+                                Edit Song
+                            </DropdownMenuItem>
+                          )}
+                      </DropdownMenuContent>
+                  </DropdownMenu>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+      {songToEdit && (
+        <EditSongDialog
+          song={songToEdit}
+          isOpen={!!songToEdit}
+          onOpenChange={(isOpen) => !isOpen && setSongToEdit(null)}
+        />
+      )}
+    </>
   );
 }

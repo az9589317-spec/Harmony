@@ -17,6 +17,8 @@ import {
   useFirestore,
   useCollection,
   useMemoFirebase,
+  errorEmitter, 
+  FirestorePermissionError
 } from '@/firebase';
 import {
   collection,
@@ -58,6 +60,7 @@ interface MusicPlayerContextType {
   getPlaylistSongs: (playlistId: string) => Song[];
   getActivePlaylistSongs: () => Song[];
   setActivePlaylistId: (playlistId: string) => void;
+  updateSong: (songId: string, updatedData: Partial<Song>) => Promise<void>;
 }
 
 const MusicPlayerContext = createContext<MusicPlayerContextType | undefined>(
@@ -387,6 +390,24 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
     });
   };
 
+  const updateSong = async (songId: string, updatedData: Partial<Song>) => {
+    if (!user || !firestore) {
+        throw new Error("User not authenticated or Firestore not available.");
+    }
+    const songRef = doc(firestore, 'users', user.uid, 'songs', songId);
+    
+    return updateDoc(songRef, updatedData).catch((serverError) => {
+      const permissionError = new FirestorePermissionError({
+        path: songRef.path,
+        operation: 'update',
+        requestResourceData: updatedData,
+      });
+      errorEmitter.emit('permission-error', permissionError);
+      // Re-throw the original error or a new one to be caught by the caller
+      throw permissionError;
+    });
+  };
+
   const togglePlayerSheet = () => {
     setIsPlayerSheetOpen(prev => !prev);
   }
@@ -419,6 +440,7 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
         getPlaylistSongs,
         getActivePlaylistSongs: () => activePlaylistSongs,
         setActivePlaylistId,
+        updateSong,
       }}
     >
       {children}
