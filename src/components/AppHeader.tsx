@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { Input } from '@/components/ui/input';
-import { Search, LogOut, PanelLeft, Music } from 'lucide-react';
+import { Search, LogOut, PanelLeft } from 'lucide-react';
 import { UploadDialog } from './UploadDialog';
 import { useUser, useAuth } from '@/firebase';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
