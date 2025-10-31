@@ -95,6 +95,7 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
       id: 'library',
       name: 'My Library',
       songIds: songs.map((s) => s.id),
+      createdAt: serverTimestamp()
     };
     return [libraryPlaylist, ...userPlaylists];
   }, [playlistsData, songs]);
@@ -221,7 +222,7 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
         const formData = new FormData();
         formData.append('file', file);
         
-        updateTaskProgress(taskId, { progress: 50 });
+        updateTaskProgress(taskId, { progress: 50, status: 'uploading' });
 
         const result = await uploadMedia(formData, 'audio');
         

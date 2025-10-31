@@ -1,10 +1,9 @@
-
 'use server'
 
 import ImageKit from 'imagekit';
 import { Buffer } from 'buffer';
 
-export async function uploadMedia(formData: FormData, mediaType: 'image' | 'audio') {
+export async function uploadMedia(formData: FormData, mediaType: 'image' | 'audio' | 'video') {
     try {
         // Initialize ImageKit inside the action to access environment variables at runtime
         const imagekit = new ImageKit({
@@ -40,6 +39,9 @@ export async function uploadMedia(formData: FormData, mediaType: 'image' | 'audi
                 break;
             case 'audio':
                 folder = '/music';
+                break;
+             case 'video':
+                folder = '/videos';
                 break;
             default:
                 folder = '/media';
