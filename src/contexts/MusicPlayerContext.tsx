@@ -2,7 +2,7 @@
 
 import type { Song, Playlist } from '@/lib/types';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
-import React, { createContext, useContext, useState, useRef, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, doc, setDoc, deleteDoc, writeBatch } from 'firebase/firestore';
 
