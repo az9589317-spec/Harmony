@@ -16,7 +16,14 @@ import {
   useFirestore,
   useCollection,
   useMemoFirebase,
+  useFirebaseApp,
 } from '@/firebase';
+import {
+  getStorage,
+  ref,
+  uploadBytesResumable,
+  getDownloadURL,
+} from 'firebase/storage';
 import {
   collection,
   doc,
@@ -26,13 +33,6 @@ import {
 } from 'firebase/firestore';
 import { v4 as uuidv4 } from 'uuid';
 import { classifyMusicGenre } from '@/ai/flows/ai-classify-uploaded-music';
-import ImageKit from 'imagekit-javascript';
-
-// SDK initialization
-const imagekit = new ImageKit({
-  publicKey: 'public_1Z4y6xViWvq28fxsG8fPbD4BZGY=',
-  urlEndpoint: 'https://ik.imagekit.io/c9okxuh0pu',
-});
 
 interface MusicPlayerContextType {
   songs: Song[];
@@ -68,6 +68,7 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
 }) => {
   const { user } = useUser();
   const firestore = useFirestore();
+  const { firebaseApp } = useFirebaseApp();
 
   const songsRef = useMemoFirebase(
     () => (user ? collection(firestore, 'users', user.uid, 'songs') : null),
@@ -144,8 +145,7 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
     const nextIndex =
       (currentTrackIndexInPlaylist + 1) % activePlaylistSongs.length;
     playTrack(nextIndex, activePlaylistId);
-  }, [currentTrackIndexInPlaylist, activePlaylistSongs, activePlaylistId]);
-
+  }, [currentTrackIndexInPlaylist, activePlaylistSongs, activePlaylistId, playTrack]);
 
   const updateTaskProgress = (
     taskId: string,
@@ -172,7 +172,7 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
       };
     });
   };
-  
+
   const fileToDataUri = (file: File) => {
     return new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
@@ -186,6 +186,7 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
     if (!user) return;
 
     const taskId = uuidv4();
+    const songId = uuidv4();
     const newTask: UploadTask = {
       id: taskId,
       fileName: file.name,
@@ -195,79 +196,69 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
     setUploadTasks((prev) => [newTask, ...prev]);
 
     try {
-      // WARNING: This is an insecure, temporary solution for demonstration.
-      // In a real app, you must create your own secure backend endpoint that uses your private key.
-      const getAuthenticationParameters = async () => {
-        try {
-            const response = await fetch(
-              'https://imagekit-auth-server-fly.dev/api/imagekit/auth'
-            );
-            if (!response.ok) {
-              const errorText = await response.text();
-              throw new Error(`Failed to fetch auth params: ${errorText} (status: ${response.status})`);
-            }
-            return response.json();
-        } catch (error) {
-            console.error("Error fetching authentication parameters:", error);
-            throw error;
+      const storage = getStorage(firebaseApp);
+      const storageRef = ref(storage, `users/${user.uid}/songs/${songId}_${file.name}`);
+      const uploadTask = uploadBytesResumable(storageRef, file);
+
+      uploadTask.on(
+        'state_changed',
+        (snapshot) => {
+          const progress =
+            (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+          updateTaskProgress(taskId, { progress });
+        },
+        (error) => {
+          console.error('Upload failed:', error);
+          updateTaskProgress(taskId, {
+            status: 'error',
+            error: error.message,
+          });
+        },
+        async () => {
+          updateTaskProgress(taskId, { progress: 100, status: 'processing' });
+          const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+
+          const [genreResponse, duration] = await Promise.all([
+            classifyMusicGenre({ musicDataUri: await fileToDataUri(file) }),
+            getAudioDuration(file),
+          ]);
+    
+          const randomAlbumArt =
+            PlaceHolderImages[Math.floor(Math.random() * PlaceHolderImages.length)]
+              .imageUrl;
+    
+          const newSong: Song = {
+            id: songId,
+            userId: user.uid,
+            title: file.name.replace(/\.[^/.]+$/, ''),
+            artist: 'Unknown Artist',
+            url: downloadURL,
+            duration: duration,
+            genre: genreResponse.genre || 'Unknown',
+            albumArtUrl: randomAlbumArt,
+          };
+    
+          const songRef = doc(firestore, 'users', user.uid, 'songs', newSong.id);
+          await setDoc(songRef, newSong);
+    
+          updateTaskProgress(taskId, { status: 'success' });
+          
+          setTimeout(() => {
+            setUploadTasks((prev) => prev.filter((t) => t.id !== taskId));
+          }, 5000);
         }
-      };
-
-      const authParams = await getAuthenticationParameters();
-      
-      const uploadResponse = await imagekit.upload({
-        file: file,
-        fileName: file.name,
-        ...authParams,
-        useUniqueFileName: true,
-        folder: `/users/${user.uid}/songs/`,
-        onUploadProgress: (progress) => {
-          updateTaskProgress(taskId, { progress: progress.percent });
-        }
-      });
-      
-      updateTaskProgress(taskId, { progress: 100, status: 'processing' });
-      
-      const downloadURL = uploadResponse.url;
-
-      const [genreResponse, duration] = await Promise.all([
-        classifyMusicGenre({ musicDataUri: await fileToDataUri(file) }),
-        getAudioDuration(file),
-      ]);
-
-      const randomAlbumArt =
-        PlaceHolderImages[Math.floor(Math.random() * PlaceHolderImages.length)]
-          .imageUrl;
-
-      const newSong: Song = {
-        id: uploadResponse.fileId,
-        userId: user.uid,
-        title: file.name.replace(/\.[^/.]+$/, ''),
-        artist: 'Unknown Artist',
-        url: downloadURL,
-        duration: duration,
-        genre: genreResponse.genre || 'Unknown',
-        albumArtUrl: randomAlbumArt,
-      };
-
-      const songRef = doc(firestore, 'users', user.uid, 'songs', newSong.id);
-      await setDoc(songRef, newSong);
-
-      updateTaskProgress(taskId, { status: 'success' });
-      
-      setTimeout(() => {
-        setUploadTasks((prev) => prev.filter((t) => t.id !== taskId));
-      }, 5000);
-
+      );
     } catch (error) {
       console.error('Upload failed:', error);
       updateTaskProgress(taskId, {
         status: 'error',
-        error: error instanceof Error ? error.message : 'Unknown error during upload.',
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Unknown error during upload.',
       });
     }
   };
-
 
   const playTrack = (
     trackIndexInPlaylist: number,
