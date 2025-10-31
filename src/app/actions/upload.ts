@@ -4,20 +4,34 @@ import ImageKit from 'imagekit';
 import { Buffer } from 'buffer';
 
 export async function uploadMedia(formData: FormData, mediaType: 'image' | 'audio') {
-    // Initialize ImageKit inside the action to access environment variables at runtime
-    const imagekit = new ImageKit({
-        publicKey: process.env.NEXT_PUBLIC_IMAGEKIT_PUBLIC_KEY!,
-        privateKey: process.env.IMAGEKIT_PRIVATE_KEY!,
-        urlEndpoint: process.env.NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT!
-    });
-
     try {
+        console.log('=== SERVER ACTION START ===');
+        console.log('Media type:', mediaType);
+        
+        // Initialize ImageKit inside the action to access environment variables at runtime
+        const imagekit = new ImageKit({
+            publicKey: process.env.NEXT_PUBLIC_IMAGEKIT_PUBLIC_KEY!,
+            privateKey: process.env.IMAGEKIT_PRIVATE_KEY!,
+            urlEndpoint: process.env.NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT!
+        });
+
         const file = formData.get('file') as File;
         
         if (!file) {
-            throw new Error('No file selected');
+            console.error('No file in formData');
+            return {
+                success: false,
+                error: 'No file provided'
+            };
         }
         
+        console.log('File:', {
+            name: file.name,
+            size: file.size,
+            type: file.type
+        });
+        
+        // Folder selection
         let folder: string;
         switch(mediaType) {
             case 'image':
@@ -30,14 +44,24 @@ export async function uploadMedia(formData: FormData, mediaType: 'image' | 'audi
                 folder = '/media';
         }
         
+        // Size check
         const maxSize = 100 * 1024 * 1024; // 100MB
         if (file.size > maxSize) {
-            throw new Error(`File too large: ${(file.size/1024/1024).toFixed(2)}MB. Max 100MB`);
+            console.error('File too large');
+            return {
+                success: false,
+                error: `File exceeds 100MB limit. File size: ${(file.size/1024/1024).toFixed(2)}MB`
+            };
         }
         
+        // Convert to buffer
+        console.log('Converting to buffer...');
         const bytes = await file.arrayBuffer();
         const buffer = Buffer.from(bytes);
+        console.log('Buffer size:', buffer.length);
         
+        // Upload
+        console.log('Starting ImageKit upload...');
         const result = await imagekit.upload({
             file: buffer,
             fileName: file.name,
@@ -46,9 +70,17 @@ export async function uploadMedia(formData: FormData, mediaType: 'image' | 'audi
             tags: [mediaType]
         });
         
-        if (!result || !result.url) {
-            throw new Error('ImageKit did not return a URL');
+        console.log('Upload result:', result);
+        
+        if (!result?.url) {
+            console.error('No URL in ImageKit response');
+            return {
+                success: false,
+                error: 'Upload failed - no URL was returned from ImageKit'
+            };
         }
+        
+        console.log('=== UPLOAD SUCCESS ===');
         
         return {
             success: true,
@@ -58,10 +90,14 @@ export async function uploadMedia(formData: FormData, mediaType: 'image' | 'audi
         };
         
     } catch (error: any) {
-        console.error('Upload function error:', error);
+        console.error('=== SERVER ACTION ERROR ===');
+        console.error('Error:', error);
+        console.error('Message:', error.message);
+        console.error('Stack:', error.stack);
+        
         return {
             success: false,
-            error: error.message
+            error: error.message || 'An unknown error occurred during upload'
         };
     }
 }
