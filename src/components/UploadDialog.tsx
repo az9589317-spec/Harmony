@@ -94,7 +94,7 @@ export function UploadDialog() {
       }
     }}>
       <DialogTrigger asChild>
-        <Button size="sm">
+        <Button size="sm" className="h-8 px-2.5">
           <Upload className="mr-2 h-4 w-4" />
           <span>Upload</span>
         </Button>
