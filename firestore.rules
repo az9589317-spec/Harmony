@@ -2,8 +2,8 @@
  * @fileoverview Firestore Security Rules for Harmony Hub.
  *
  * Core Philosophy:
- * This ruleset enforces a strict user-ownership model for personal data (songs, playlists)
- * and allows authenticated users to create their own user profiles.
+ * This ruleset enforces a strict user-ownership model for personal data (playlists)
+ * while allowing public read access for community content (songs, posts).
  *
  * Data Structure:
  * - /users/{userId}: Stores user profiles.
@@ -12,14 +12,11 @@
  * - /posts/{postId}: Stores all posts for the community feed.
  *
  * Key Security Decisions:
- * - Users can only create, update, or delete their own data (songs, playlists, posts).
+ * - Users can only create, update, or delete their own data (playlists, posts, songs).
  * - Anyone can read posts in the community feed.
+ * - Anyone can read any song from any user.
  * - User listing is disallowed for privacy.
  * - All write operations require authentication.
- *
- * Denormalization for Authorization:
- * - The `userId` is embedded in song, playlist, and post documents to enforce user-ownership.
- *   This allows security rules to efficiently verify ownership without additional `get()` calls.
  */
 rules_version = '2';
 service cloud.firestore {
@@ -47,51 +44,49 @@ service cloud.firestore {
       allow list: if false; // Disallow listing all users
       allow update: if false; // Updates handled via specific functions/paths if needed
       allow delete: if false;
-    }
 
-    /**
-     * @description Protects the /users/{userId}/songs collection, ensuring only the owner can manage their songs.
-     * @path /users/{userId}/songs/{songId}
-     * @allow (create) User 'user_abc' can create /users/user_abc/songs/song1 if authenticated.
-     * @allow (get, list) User 'user_abc' can read their own songs.
-     * @deny (create, update, delete) User 'user_xyz' cannot create, update, or delete /users/user_abc/songs/song1.
-     * @principle Enforces strict user-ownership for song management.
-     */
-    match /users/{userId}/songs/{songId} {
-      function isExistingOwner() {
-          return isOwner(userId) && resource != null;
-      }
-      allow create: if isSignedIn() && isOwner(userId) && request.resource.data.userId == userId;
-      allow get: if isSignedIn() && isOwner(userId);
-      allow list: if isSignedIn() && isOwner(userId);
-      allow update: if isSignedIn() && isExistingOwner() && request.resource.data.userId == resource.data.userId;
-      allow delete: if isSignedIn() && isExistingOwner();
-    }
-
-    /**
-     * @description Protects the /users/{userId}/playlists collection, ensuring only the owner can manage their playlists.
-     * @path /users/{userId}/playlists/{playlistId}
-     * @allow (create) User 'user_abc' can create /users/user_abc/playlists/playlist1 if authenticated.
-     * @allow (get, list) User 'user_abc' can read their own playlists.
-     * @deny (create, update, delete) User 'user_xyz' cannot create, update, or delete /users/user_abc/playlists/playlist1.
-     * @principle Enforces strict user-ownership for playlist management.
-     */
-    match /users/{userId}/playlists/{playlistId} {
+      /**
+       * @description Protects the /users/{userId}/songs collection, ensuring only the owner can manage their songs, but anyone can read them.
+       * @path /users/{userId}/songs/{songId}
+       * @allow (get, list) Anyone can read any song.
+       * @allow (create, update, delete) Only the owner can manage their songs.
+       * @principle Public read access for songs, but write access is restricted to the owner.
+       */
+      match /songs/{songId} {
         function isExistingOwner() {
             return isOwner(userId) && resource != null;
         }
-
+        allow get: if true;
+        allow list: if true;
         allow create: if isSignedIn() && isOwner(userId) && request.resource.data.userId == userId;
-        allow get: if isSignedIn() && isOwner(userId);
-        allow list: if isSignedIn() && isOwner(userId);
         allow update: if isSignedIn() && isExistingOwner() && request.resource.data.userId == resource.data.userId;
         allow delete: if isSignedIn() && isExistingOwner();
+      }
+
+      /**
+       * @description Protects the /users/{userId}/playlists collection, ensuring only the owner can manage their playlists.
+       * @path /users/{userId}/playlists/{playlistId}
+       * @allow (create, get, list, update, delete) Only the owner can manage their playlists.
+       * @principle Enforces strict user-ownership for playlist management.
+       */
+      match /playlists/{playlistId} {
+          function isExistingOwner() {
+              return isOwner(userId) && resource != null;
+          }
+
+          allow create: if isSignedIn() && isOwner(userId) && request.resource.data.userId == userId;
+          allow get: if isSignedIn() && isOwner(userId);
+          allow list: if isSignedIn() && isOwner(userId);
+          allow update: if isSignedIn() && isExistingOwner() && request.resource.data.userId == resource.data.userId;
+          allow delete: if isSignedIn() && isExistingOwner();
+      }
     }
+
 
     /**
      * @description Manages the /posts collection for the community feed.
      * @path /posts/{postId}
-     * @allow (list, get) Any authenticated user can read posts for the community feed.
+     * @allow (list, get) Anyone can read posts for the community feed.
      * @allow (create) Authenticated users can create posts.
      * @allow (update, delete) Only the owner of the post can update or delete it.
      * @principle Allows a public read feed while restricting write access to owners.
@@ -111,7 +106,7 @@ service cloud.firestore {
         return request.resource.data;
       }
 
-      allow list, get: if isSignedIn();
+      allow list, get: if true;
       allow create: if isSignedIn() 
                       && isNewPostOwner()
                       && (incomingData().content.size() > 0 || incomingData().imageUrl.size() > 0)

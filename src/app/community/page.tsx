@@ -165,11 +165,11 @@ export default function CommunityPage() {
   );
   const { data: posts, isLoading: isPostsLoading } = useCollection<Post>(postsQuery);
 
-  useEffect(() => {
-    if (!isUserLoading && !user) {
-      router.push('/login');
-    }
-  }, [user, isUserLoading, router]);
+  // useEffect(() => {
+  //   if (!isUserLoading && !user) {
+  //     router.push('/login');
+  //   }
+  // }, [user, isUserLoading, router]);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -250,13 +250,13 @@ export default function CommunityPage() {
     }
   };
 
-  if (isUserLoading || !user) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
-    );
-  }
+  // if (isUserLoading) {
+  //   return (
+  //     <div className="flex items-center justify-center h-screen">
+  //       <Loader2 className="h-8 w-8 animate-spin" />
+  //     </div>
+  //   );
+  // }
 
   return (
     <SidebarProvider>
@@ -272,39 +272,41 @@ export default function CommunityPage() {
             />
             <ScrollArea className="flex-1">
                 <div className="p-4 md:p-6 space-y-6">
-                <Card>
-                    <form ref={formRef} onSubmit={handlePostSubmit}>
-                        <CardContent className="p-4 space-y-4">
-                            <Textarea
-                                placeholder="What's on your mind?"
-                                value={postContent}
-                                onChange={(e) => setPostContent(e.target.value)}
-                                className="text-base"
-                                rows={3}
-                                name="content"
-                            />
-                            {imagePreview && (
-                                <div className="relative w-32 h-32">
-                                    <Image src={imagePreview} alt="Image preview" fill className="rounded-md object-cover"/>
-                                    <Button variant="destructive" size="icon" className="absolute top-1 right-1 h-6 w-6" onClick={removeImage}>
-                                        <X className="h-4 w-4" />
+                {user && (
+                    <Card>
+                        <form ref={formRef} onSubmit={handlePostSubmit}>
+                            <CardContent className="p-4 space-y-4">
+                                <Textarea
+                                    placeholder="What's on your mind?"
+                                    value={postContent}
+                                    onChange={(e) => setPostContent(e.target.value)}
+                                    className="text-base"
+                                    rows={3}
+                                    name="content"
+                                />
+                                {imagePreview && (
+                                    <div className="relative w-32 h-32">
+                                        <Image src={imagePreview} alt="Image preview" fill className="rounded-md object-cover"/>
+                                        <Button variant="destructive" size="icon" className="absolute top-1 right-1 h-6 w-6" onClick={removeImage}>
+                                            <X className="h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                )}
+                                <div className="flex justify-between items-center">
+                                    <Button type="button" variant="ghost" size="icon" onClick={() => fileInputRef.current?.click()}>
+                                        <Paperclip className="h-5 w-5 text-muted-foreground" />
+                                        <span className="sr-only">Attach image</span>
+                                    </Button>
+                                    <Input type="file" name="file" accept="image/*" ref={fileInputRef} onChange={handleImageChange} className="hidden" />
+                                    <Button type="submit" disabled={isSubmitting || (!postContent.trim() && !postImage)}>
+                                        {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                        Post
                                     </Button>
                                 </div>
-                            )}
-                            <div className="flex justify-between items-center">
-                                <Button type="button" variant="ghost" size="icon" onClick={() => fileInputRef.current?.click()}>
-                                    <Paperclip className="h-5 w-5 text-muted-foreground" />
-                                    <span className="sr-only">Attach image</span>
-                                </Button>
-                                <Input type="file" name="file" accept="image/*" ref={fileInputRef} onChange={handleImageChange} className="hidden" />
-                                <Button type="submit" disabled={isSubmitting || (!postContent.trim() && !postImage)}>
-                                    {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                    Post
-                                </Button>
-                            </div>
-                        </CardContent>
-                    </form>
-                </Card>
+                            </CardContent>
+                        </form>
+                    </Card>
+                )}
 
                 {/* Posts Feed */}
                 <div className="space-y-4">
