@@ -114,12 +114,14 @@ export function SongList({ songs, playlistId }: SongListProps) {
                 className="cursor-pointer transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted"
             >
                 <CardContent className="flex items-center gap-3 p-2">
-                    <AlbumArt src={song.albumArtUrl} alt={song.title} className="w-12 h-12" />
+                    <AlbumArt src={song.albumArtUrl} alt={song.title} className="w-12 h-12 shrink-0" />
                     <div className="flex-1 min-w-0">
                         <p className="font-medium truncate">{song.title}</p>
                         <p className="text-sm text-muted-foreground truncate">{song.artist}</p>
                     </div>
-                    <SongItemMenu song={song} onEdit={handleEdit} />
+                    <div className="shrink-0">
+                        <SongItemMenu song={song} onEdit={handleEdit} />
+                    </div>
                 </CardContent>
             </Card>
         ))}
