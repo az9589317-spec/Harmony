@@ -77,8 +77,8 @@ export function AppHeader({ playlistName, onSearchChange }: AppHeaderProps) {
           </div>
 
         {isMobile && isSearchVisible && (
-           <div className="absolute top-16 left-0 right-0 p-2 bg-card border-b z-10">
-            <div className="relative">
+           <div className="absolute top-0 left-0 right-0 p-2 bg-card border-b z-10 h-16 flex items-center">
+            <div className="relative w-full">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                 placeholder="Search..."

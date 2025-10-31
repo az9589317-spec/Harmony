@@ -63,10 +63,10 @@ export function SongList({ songs, playlistId }: SongListProps) {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-12"></TableHead>
+              <TableHead className="w-12 px-2 md:px-4"></TableHead>
               <TableHead>Title</TableHead>
-              <TableHead>Artist</TableHead>
-              <TableHead>Genre</TableHead>
+              <TableHead className="hidden md:table-cell">Artist</TableHead>
+              <TableHead className="hidden lg:table-cell">Genre</TableHead>
               <TableHead className="text-right w-24">
                 <Clock className="inline-block w-4 h-4" />
               </TableHead>
@@ -81,7 +81,7 @@ export function SongList({ songs, playlistId }: SongListProps) {
                   data-state={currentTrack?.id === song.id ? 'selected' : undefined}
                   onClick={() => playTrack(index, playlistId)}
               >
-                <TableCell>
+                <TableCell className="px-2 md:px-4">
                   <div className="relative">
                     <AlbumArt src={song.albumArtUrl} alt={song.title} className="w-10 h-10" />
                     <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
@@ -89,13 +89,16 @@ export function SongList({ songs, playlistId }: SongListProps) {
                     </div>
                   </div>
                 </TableCell>
-                <TableCell className="font-medium">{song.title}</TableCell>
-                <TableCell className="text-muted-foreground">{song.artist}</TableCell>
-                <TableCell className="text-muted-foreground capitalize">{song.genre}</TableCell>
+                <TableCell className="font-medium">
+                  <div>{song.title}</div>
+                  <div className="text-muted-foreground text-xs md:hidden">{song.artist}</div>
+                </TableCell>
+                <TableCell className="text-muted-foreground hidden md:table-cell">{song.artist}</TableCell>
+                <TableCell className="text-muted-foreground capitalize hidden lg:table-cell">{song.genre}</TableCell>
                 <TableCell className="text-right text-muted-foreground">
                   {formatDuration(song.duration)}
                 </TableCell>
-                <TableCell onClick={(e) => e.stopPropagation()}>
+                <TableCell onClick={(e) => e.stopPropagation()} className="px-2 md:px-4">
                   <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                           <button className="p-2 opacity-0 group-hover:opacity-100 focus:opacity-100 rounded-full hover:bg-secondary">
