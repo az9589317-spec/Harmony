@@ -3,7 +3,7 @@
 import { useUser, useFirestore } from '@/firebase';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, useRef } from 'react';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { Loader2, Paperclip, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -29,7 +29,10 @@ function PostCard({ post }: { post: Post }) {
         return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
     }
 
-    const timeAgo = post.createdAt ? formatDistanceToNow(new Date(post.createdAt), { addSuffix: true }) : 'just now';
+    const timeAgo = post.createdAt && (post.createdAt as Timestamp).toDate ? 
+        formatDistanceToNow((post.createdAt as Timestamp).toDate(), { addSuffix: true }) : 
+        'just now';
+
 
   return (
     <Card>
@@ -112,6 +115,10 @@ export default function CommunityPage() {
 
         if (postImage) {
             const formData = new FormData(formRef.current);
+            // Ensure file is appended if not already there from form
+            if (!formData.has('file') && postImage) {
+              formData.append('file', postImage);
+            }
             const result = await uploadImage(formData);
             
             if (!result.success) {
