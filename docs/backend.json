@@ -1,0 +1,198 @@
+{
+  "entities": {
+    "User": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "User",
+      "type": "object",
+      "description": "Represents a user of the Harmony Hub application.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the User entity."
+        },
+        "email": {
+          "type": "string",
+          "description": "User's email address.",
+          "format": "email"
+        },
+        "username": {
+          "type": "string",
+          "description": "User's display name."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the user account was created.",
+          "format": "date-time"
+        },
+        "lastLogin": {
+          "type": "string",
+          "description": "Timestamp indicating when the user last logged in.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "email",
+        "username",
+        "createdAt"
+      ]
+    },
+    "Song": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Song",
+      "type": "object",
+      "description": "Represents a music track uploaded by a user.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Song entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to User. (Relationship: User 1:N Song)"
+        },
+        "title": {
+          "type": "string",
+          "description": "Title of the song."
+        },
+        "artist": {
+          "type": "string",
+          "description": "Artist of the song."
+        },
+        "genre": {
+          "type": "string",
+          "description": "Genre of the song."
+        },
+        "uploadDate": {
+          "type": "string",
+          "description": "Timestamp indicating when the song was uploaded.",
+          "format": "date-time"
+        },
+        "fileUrl": {
+          "type": "string",
+          "description": "URL of the song file.",
+          "format": "uri"
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "title",
+        "artist",
+        "genre",
+        "uploadDate",
+        "fileUrl"
+      ]
+    },
+    "Playlist": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Playlist",
+      "type": "object",
+      "description": "Represents a user-created playlist of songs.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Playlist entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to User. (Relationship: User 1:N Playlist)"
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the playlist."
+        },
+        "description": {
+          "type": "string",
+          "description": "Description of the playlist."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the playlist was created.",
+          "format": "date-time"
+        },
+        "songIds": {
+          "type": "array",
+          "description": "References to Songs. (Relationship: Playlist N:N Song)",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "name",
+        "createdAt",
+        "songIds"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/users/{userId}",
+        "definition": {
+          "entityName": "User",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Stores user profiles. Each document is keyed by the user's unique ID.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/songs/{songId}",
+        "definition": {
+          "entityName": "Song",
+          "schema": {
+            "$ref": "#/backend/entities/Song"
+          },
+          "description": "Stores songs uploaded by a specific user. Path-based ownership ensures only the user can access these songs.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user."
+            },
+            {
+              "name": "songId",
+              "description": "The unique identifier of the song."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/playlists/{playlistId}",
+        "definition": {
+          "entityName": "Playlist",
+          "schema": {
+            "$ref": "#/backend/entities/Playlist"
+          },
+          "description": "Stores playlists created by a specific user. Path-based ownership ensures only the user can manage these playlists.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user."
+            },
+            {
+              "name": "playlistId",
+              "description": "The unique identifier of the playlist."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore data structure is designed to support the Harmony Hub application, focusing on user authentication, song uploads, and playlist management. It prioritizes security, scalability, and debuggability by adhering to the principles of Authorization Independence, Structural Segregation, and Access Modeling. Path-based ownership is used for private user data, while membership maps are used for collaborative data (although collaborative data is not explicitly present in the requirements). Explicit state modeling (if applicable in the future) and predictable schema patterns enhance debuggability.\n\nAuthorization Independence is achieved primarily through path-based ownership for songs. Each user has their own collection of songs under `/users/{userId}/songs/{songId}`. Security rules can then directly check `request.auth.uid == userId` without needing to `get()` parent documents.  This enables atomic operations and simplifies security rules.\n\nStructural Segregation is applied by storing each user's songs in a dedicated subcollection under their user document (`/users/{userId}/songs`). This ensures that security rules for song access are consistent within the collection.  User data is stored at `/users/{userId}`, and roles (if implemented) would be in dedicated collections, further separating concerns.\n\nThe structure also supports QAPs. Listing songs is restricted to the owning user via the `/users/{userId}/songs` path, ensuring that users can only access their own data. The use of dedicated collections for different entity types prevents mixing data with different access requirements."
+  }
+}

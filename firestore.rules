@@ -1,0 +1,106 @@
+/**
+ * @fileoverview Firestore Security Rules for Harmony Hub.
+ *
+ * Core Philosophy:
+ * This ruleset enforces a strict user-ownership model for personal data (songs, playlists)
+ * and allows authenticated users to create their own user profiles.
+ *
+ * Data Structure:
+ * - /users/{userId}: Stores user profiles.
+ * - /users/{userId}/songs/{songId}: Stores songs uploaded by each user.
+ * - /users/{userId}/playlists/{playlistId}: Stores playlists created by each user.
+ *
+ * Key Security Decisions:
+ * - Users can only access their own songs and playlists.
+ * - User listing is disallowed for privacy.
+ * - All write operations require authentication.
+ *
+ * Denormalization for Authorization:
+ * - The `userId` is embedded in the song and playlist paths to enforce user-ownership.
+ *   This allows security rules to efficiently verify ownership without additional `get()` calls.
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /**
+     * @description Protects the /users collection, allowing only authenticated users to create their own profile.
+     * @path /users/{userId}
+     * @allow (create) User 'user_abc' can create /users/user_abc if authenticated.
+     * @deny (create) User 'user_xyz' cannot create /users/user_abc.
+     * @deny (get, list, update, delete) No one can get, list, update, or delete user documents directly.
+     * @principle Enforces user-ownership; authenticated user can create only their own profile.
+     */
+    match /users/{userId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      function isOwner(userId) {
+        return request.auth.uid == userId;
+      }
+
+      allow create: if isSignedIn() && isOwner(userId) && request.resource.data.id == userId;
+      allow get: if false;
+      allow list: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    /**
+     * @description Protects the /users/{userId}/songs collection, ensuring only the owner can manage their songs.
+     * @path /users/{userId}/songs/{songId}
+     * @allow (create) User 'user_abc' can create /users/user_abc/songs/song1 if authenticated.
+     * @allow (get, list) User 'user_abc' can read their own songs.
+     * @deny (create, update, delete) User 'user_xyz' cannot create, update, or delete /users/user_abc/songs/song1.
+     * @principle Enforces strict user-ownership for song management.
+     */
+    match /users/{userId}/songs/{songId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      function isOwner(userId) {
+        return request.auth.uid == userId;
+      }
+
+        function isExistingOwner(userId) {
+            return isOwner(userId) && resource != null;
+        }
+
+      allow create: if isSignedIn() && isOwner(userId) && request.resource.data.userId == userId;
+      allow get: if isSignedIn() && isOwner(userId);
+      allow list: if isSignedIn() && isOwner(userId);
+      allow update: if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId;
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /**
+     * @description Protects the /users/{userId}/playlists collection, ensuring only the owner can manage their playlists.
+     * @path /users/{userId}/playlists/{playlistId}
+     * @allow (create) User 'user_abc' can create /users/user_abc/playlists/playlist1 if authenticated.
+     * @allow (get, list) User 'user_abc' can read their own playlists.
+     * @deny (create, update, delete) User 'user_xyz' cannot create, update, or delete /users/user_abc/playlists/playlist1.
+     * @principle Enforces strict user-ownership for playlist management.
+     */
+    match /users/{userId}/playlists/{playlistId} {
+        function isSignedIn() {
+            return request.auth != null;
+        }
+
+        function isOwner(userId) {
+            return request.auth.uid == userId;
+        }
+
+        function isExistingOwner(userId) {
+            return isOwner(userId) && resource != null;
+        }
+
+        allow create: if isSignedIn() && isOwner(userId) && request.resource.data.userId == userId;
+        allow get: if isSignedIn() && isOwner(userId);
+        allow list: if isSignedIn() && isOwner(userId);
+        allow update: if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId;
+        allow delete: if isExistingOwner(userId);
+    }
+  }
+}
