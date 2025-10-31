@@ -105,28 +105,32 @@ export function SongList({ songs, playlistId }: SongListProps) {
     const hasMore = songs.length > mobileLimit;
 
     return (
-      <div className="space-y-2 p-2 sm:p-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 p-4">
         {songsToShow.map((song, index) => (
              <Card 
                 key={song.id} 
-                onClick={() => playTrack(index, playlistId)}
                 data-state={currentTrack?.id === song.id ? 'selected' : undefined}
-                className="cursor-pointer transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted"
+                className="cursor-pointer transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted overflow-hidden group"
             >
-                <CardContent className="flex items-center gap-3 p-2">
-                    <AlbumArt src={song.albumArtUrl} alt={song.title} className="w-12 h-12 shrink-0" />
-                    <div className="flex-1 min-w-0">
-                        <p className="font-medium truncate">{song.title}</p>
-                        <p className="text-sm text-muted-foreground truncate">{song.artist}</p>
+                <CardContent className="p-0 flex flex-col relative">
+                    <div onClick={() => playTrack(index, playlistId)} className="relative aspect-square">
+                        <AlbumArt src={song.albumArtUrl} alt={song.title} className="w-full h-full rounded-b-none" />
+                        <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Play className="w-8 h-8 text-white" fill="white"/>
+                        </div>
                     </div>
-                    <div className="shrink-0">
-                        <SongItemMenu song={song} onEdit={handleEdit} />
+                    <div className="absolute top-0 right-0">
+                       <SongItemMenu song={song} onEdit={handleEdit} />
+                    </div>
+                    <div className="p-2 min-w-0">
+                        <p className="font-medium truncate text-sm">{song.title}</p>
+                        <p className="text-xs text-muted-foreground truncate">{song.artist}</p>
                     </div>
                 </CardContent>
             </Card>
         ))}
         {hasMore && (
-          <div className="pt-4 text-center">
+          <div className="pt-4 text-center col-span-2 sm:col-span-3">
             <Button variant="outline" onClick={() => setMobileLimit(prev => prev + 15)}>
               Show More
             </Button>
