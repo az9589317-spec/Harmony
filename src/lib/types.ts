@@ -6,6 +6,7 @@ export interface Song {
   duration: number;
   genre: string;
   albumArtUrl: string;
+  userId?: string;
 }
 
 export interface Playlist {

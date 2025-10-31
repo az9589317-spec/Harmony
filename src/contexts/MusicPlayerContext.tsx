@@ -30,7 +30,7 @@ interface MusicPlayerContextType {
   duration: number;
   volume: number;
   activePlaylistId: string;
-  addSong: (song: Omit<Song, 'id' | 'userId' | 'url'>, file: File) => Promise<void>;
+  addSong: (song: Omit<Song, 'id' | 'url' | 'userId'>, file: File) => Promise<void>;
   playTrack: (trackIndex: number, playlistId?: string) => void;
   togglePlayPause: () => void;
   playNext: () => void;
@@ -125,7 +125,7 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
   }, [currentTrack]);
 
   const addSong = async (
-    song: Omit<Song, 'id' | 'userId' | 'url'>, file: File
+    song: Omit<Song, 'id'| 'url' | 'userId'>, file: File
   ) => {
     if (!user) return;
     const songId = doc(collection(firestore, 'temp')).id;
