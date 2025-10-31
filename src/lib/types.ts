@@ -22,3 +22,5 @@ export interface UploadTask {
   status: 'uploading' | 'processing' | 'success' | 'error';
   error?: string;
 }
+
+    

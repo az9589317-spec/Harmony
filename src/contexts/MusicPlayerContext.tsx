@@ -17,15 +17,21 @@ import {
   useCollection,
   useMemoFirebase,
 } from '@/firebase';
-import { collection, doc, setDoc } from 'firebase/firestore';
-import ImageKit from 'imagekit-javascript';
+import {
+  collection,
+  doc,
+  setDoc,
+  updateDoc,
+  arrayUnion,
+} from 'firebase/firestore';
 import { v4 as uuidv4 } from 'uuid';
 import { classifyMusicGenre } from '@/ai/flows/ai-classify-uploaded-music';
+import ImageKit from 'imagekit-javascript';
 
-// This is not secure and should be replaced with a server-side authentication endpoint
+// SDK initialization
 const imagekit = new ImageKit({
-    publicKey: "public_1Z4y6xViWvq28fxsG8fPbD4BZGY=",
-    urlEndpoint: "https://ik.imagekit.io/c9okxuh0pu",
+  publicKey: 'public_1Z4y6xViWvq28fxsG8fPbD4BZGY=',
+  urlEndpoint: 'https://ik.imagekit.io/c9okxuh0pu',
 });
 
 interface MusicPlayerContextType {
@@ -68,7 +74,6 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
     [firestore, user]
   );
   const { data: songsData } = useCollection<Song>(songsRef);
-  const songs = songsData || [];
 
   const playlistsRef = useMemoFirebase(
     () => (user ? collection(firestore, 'users', user.uid, 'playlists') : null),
@@ -85,6 +90,8 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
   const [volume, setVolumeState] = useState(0.8);
   const audioRef = useRef<HTMLAudioElement>(null);
   const [uploadTasks, setUploadTasks] = useState<UploadTask[]>([]);
+
+  const songs = useMemo(() => songsData || [], [songsData]);
 
   const playlists: Playlist[] = useMemo(() => {
     const userPlaylists = playlistsData || [];
@@ -130,12 +137,22 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
       audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
       audio.removeEventListener('ended', handleEnded);
     };
-  }, [currentTrack]);
+  }, [currentTrack]); // Dependency on currentTrack is correct here
 
-  const updateTaskProgress = (taskId: string,-
-                                  progress: Partial<UploadTask>) => {
-    setUploadTasks(prevTasks =>
-      prevTasks.map(task =>
+  const playNext = useCallback(() => {
+    if (currentTrackIndexInPlaylist === null) return;
+    const nextIndex =
+      (currentTrackIndexInPlaylist + 1) % activePlaylistSongs.length;
+    playTrack(nextIndex, activePlaylistId);
+  }, [currentTrackIndexInPlaylist, activePlaylistSongs.length, activePlaylistId]);
+
+
+  const updateTaskProgress = (
+    taskId: string,
+    progress: Partial<UploadTask>
+  ) => {
+    setUploadTasks((prevTasks) =>
+      prevTasks.map((task) =>
         task.id === taskId ? { ...task, ...progress } : task
       )
     );
@@ -150,7 +167,7 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
         URL.revokeObjectURL(audio.src);
       };
       audio.onerror = () => {
-        resolve(0);
+        resolve(0); // Default to 0 if duration can't be read
         URL.revokeObjectURL(audio.src);
       };
     });
@@ -158,7 +175,7 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const addSong = async (file: File) => {
     if (!user) return;
-    
+
     const taskId = uuidv4();
     const newTask: UploadTask = {
       id: taskId,
@@ -166,22 +183,22 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
       progress: 0,
       status: 'uploading',
     };
-    setUploadTasks(prev => [...prev, newTask]);
+    setUploadTasks((prev) => [newTask, ...prev]);
 
     try {
-      // 1. Get Authentication Parameters from your backend
-      // This is a placeholder for where you would fetch auth params from your server
+      // 1. Get Authentication Parameters from a backend
+      // WARNING: This is an insecure, temporary solution for demonstration.
+      // In a real app, you must create your own secure backend endpoint that uses your private key.
       const getAuthenticationParameters = async () => {
-        // In a real app, you'd fetch this from a secure server-side endpoint
-        // that uses your private key to generate a token and expiry.
-        // DO NOT expose your private key on the client.
-        const response = await fetch('https://imagekit-auth-server-fly.dev/api/imagekit/auth');
+        const response = await fetch(
+          'https://imagekit-auth-server-fly.dev/api/imagekit/auth'
+        );
         if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Failed to fetch auth params: ${errorText}`);
+          const errorText = await response.text();
+          throw new Error(`Failed to fetch auth params: ${errorText}`);
         }
         return response.json();
-      }
+      };
 
       const authParams = await getAuthenticationParameters();
 
@@ -192,19 +209,16 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
         ...authParams,
         useUniqueFileName: true,
         folder: `/users/${user.uid}/songs/`,
-      }, (err, result) => {
-          if (err) {
-              throw err;
-          }
-          if (result) {
-            updateTaskProgress(taskId, { progress: 100, status: 'processing' });
-          }
+        onUploadProgress: (progress) => {
+          updateTaskProgress(taskId, { progress: progress.percent });
+        }
       });
+      
+      updateTaskProgress(taskId, { progress: 100, status: 'processing' });
       
       const downloadURL = uploadResponse.url;
 
-      updateTaskProgress(taskId, { status: 'processing' });
-
+      // 3. Classify Genre and Get Duration
       const [genreResponse, duration] = await Promise.all([
         classifyMusicGenre({ musicDataUri: await fileToDataUri(file) }),
         getAudioDuration(file),
@@ -214,28 +228,30 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
         PlaceHolderImages[Math.floor(Math.random() * PlaceHolderImages.length)]
           .imageUrl;
 
+      // 4. Save Song to Firestore
       const newSong: Song = {
         id: uploadResponse.fileId,
         userId: user.uid,
-        title: file.name.replace(/\.[^/.]+$/, ""),
+        title: file.name.replace(/\.[^/.]+$/, ''),
         artist: 'Unknown Artist',
         url: downloadURL,
-        duration,
+        duration: duration,
         genre: genreResponse.genre || 'Unknown',
         albumArtUrl: randomAlbumArt,
       };
 
       const songRef = doc(firestore, 'users', user.uid, 'songs', newSong.id);
       await setDoc(songRef, newSong);
-      
+
       updateTaskProgress(taskId, { status: 'success' });
-      // Optionally remove successful uploads after a delay
+      
+      // 5. Remove from progress list after a delay
       setTimeout(() => {
-        setUploadTasks(prev => prev.filter(t => t.id !== taskId));
+        setUploadTasks((prev) => prev.filter((t) => t.id !== taskId));
       }, 5000);
 
     } catch (error) {
-      console.error("Upload failed:", error);
+      console.error('Upload failed:', error);
       updateTaskProgress(taskId, {
         status: 'error',
         error: error instanceof Error ? error.message : 'Unknown error',
@@ -245,12 +261,12 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const fileToDataUri = (file: File) => {
     return new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
     });
-  }
+  };
 
   const playTrack = (
     trackIndexInPlaylist: number,
@@ -265,7 +281,7 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
     if (track && audioRef.current) {
       if (track.url) {
         audioRef.current.src = track.url;
-        audioRef.current.crossOrigin = "anonymous";
+        audioRef.current.crossOrigin = 'anonymous'; // Important for hosted content
       }
       setCurrentTrackIndexInPlaylist(trackIndexInPlaylist);
       audioRef.current
@@ -287,12 +303,6 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
         .catch((e) => console.error('Playback failed', e));
     }
   };
-
-  const playNext = useCallback(() => {
-    if (currentTrackIndexInPlaylist === null) return;
-    const nextIndex = (currentTrackIndexInPlaylist + 1) % activePlaylistSongs.length;
-    playTrack(nextIndex, activePlaylistId);
-  }, [currentTrackIndexInPlaylist, activePlaylistSongs.length, activePlaylistId, playTrack]);
 
   const playPrevious = () => {
     if (currentTrackIndexInPlaylist === null) return;
@@ -318,29 +328,30 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const createPlaylist = async (name: string) => {
     if (!user) return;
-    const playlistId = doc(collection(firestore, 'temp')).id;
-    const playlistRef = doc(firestore, 'users', user.uid, 'playlists', playlistId);
-    const newPlaylist: Playlist = { id: playlistId, name, songIds: [] };
+    const newPlaylistId = uuidv4();
+    const playlistRef = doc(
+      firestore,
+      'users',
+      user.uid,
+      'playlists',
+      newPlaylistId
+    );
+    const newPlaylist: Playlist = { id: newPlaylistId, name, songIds: [] };
     await setDoc(playlistRef, newPlaylist);
   };
 
   const addSongToPlaylist = async (songId: string, playlistId: string) => {
     if (!user || playlistId === 'library') return;
-    const playlist = playlists.find((p) => p.id === playlistId);
-    if (playlist && !playlist.songIds.includes(songId)) {
-      const playlistRef = doc(
-        firestore,
-        'users',
-        user.uid,
-        'playlists',
-        playlistId
-      );
-      await setDoc(
-        playlistRef,
-        { songIds: [...playlist.songIds, songId] },
-        { merge: true }
-      );
-    }
+    const playlistRef = doc(
+      firestore,
+      'users',
+      user.uid,
+      'playlists',
+      playlistId
+    );
+    await updateDoc(playlistRef, {
+      songIds: arrayUnion(songId),
+    });
   };
 
   return (
@@ -383,3 +394,5 @@ export const useMusicPlayer = () => {
   }
   return context;
 };
+
+    
