@@ -4,6 +4,10 @@ import ImageKit from 'imagekit';
 export async function GET(request: Request) {
   try {
     // Initialization must be inside the handler to access environment variables reliably.
+    if (!process.env.NEXT_PUBLIC_IMAGEKIT_PUBLIC_KEY || !process.env.IMAGEKIT_PRIVATE_KEY || !process.env.NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT) {
+        throw new Error('ImageKit environment variables are not configured.');
+    }
+      
     const imagekit = new ImageKit({
       publicKey: process.env.NEXT_PUBLIC_IMAGEKIT_PUBLIC_KEY!,
       privateKey: process.env.IMAGEKIT_PRIVATE_KEY!,
