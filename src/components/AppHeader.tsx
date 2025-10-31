@@ -65,9 +65,6 @@ export function AppHeader({ playlistName, onSearchChange }: AppHeaderProps) {
         {/* Show logo on mobile */}
         <div className="flex items-center gap-2 md:hidden">
             <Headphones className="w-6 h-6 text-accent" />
-            <h1 className="text-lg font-bold text-foreground font-headline">
-            Harmony Hub
-            </h1>
         </div>
 
         {/* Show playlist name on desktop */}
