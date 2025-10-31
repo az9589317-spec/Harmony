@@ -114,9 +114,9 @@ service cloud.firestore {
       allow list, get: if isSignedIn();
       allow create: if isSignedIn() 
                       && isNewPostOwner()
+                      && (incomingData().content.size() > 0 || incomingData().imageUrl.size() > 0)
                       && incomingData().content is string
-                      && incomingData().content.size() > 0
-                      && (!('imageUrl' in incomingData()) || (incomingData().imageUrl is string && incomingData().imageUrl.size() > 0));
+                      && (!('imageUrl' in incomingData()) || (incomingData().imageUrl is string));
 
       allow update, delete: if isSignedIn() && isPostOwner();
     }
