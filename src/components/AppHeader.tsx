@@ -1,8 +1,9 @@
+
 "use client";
 
 import React, { useState } from 'react';
 import { Input } from '@/components/ui/input';
-import { Search, LogOut, PanelLeft } from 'lucide-react';
+import { Search, LogOut, PanelLeft, Headphones } from 'lucide-react';
 import { UploadDialog } from './UploadDialog';
 import { useUser, useAuth } from '@/firebase';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
@@ -61,7 +62,16 @@ export function AppHeader({ playlistName, onSearchChange }: AppHeaderProps) {
           <span className="sr-only">Toggle Sidebar</span>
         </Button>
         
-        <h1 className="text-lg sm:text-xl font-bold tracking-tight font-headline truncate max-w-[150px] sm:max-w-xs">
+        {/* Show logo on mobile */}
+        <div className="flex items-center gap-2 md:hidden">
+            <Headphones className="w-6 h-6 text-accent" />
+            <h1 className="text-lg font-bold text-foreground font-headline">
+            Harmony Hub
+            </h1>
+        </div>
+
+        {/* Show playlist name on desktop */}
+        <h1 className="hidden md:block text-lg sm:text-xl font-bold tracking-tight font-headline truncate max-w-[150px] sm:max-w-xs">
           {playlistName}
         </h1>
       </div>
