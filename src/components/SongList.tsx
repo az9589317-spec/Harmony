@@ -100,7 +100,7 @@ export function SongList({ songs, playlistId }: SongListProps) {
   }
 
   const renderMobileList = () => (
-    <div className="space-y-2 p-2">
+    <div className="space-y-2 p-2 sm:p-4">
         {songs.map((song, index) => (
              <Card 
                 key={song.id} 
@@ -108,9 +108,9 @@ export function SongList({ songs, playlistId }: SongListProps) {
                 data-state={currentTrack?.id === song.id ? 'selected' : undefined}
                 className="cursor-pointer transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted"
             >
-                <CardContent className="flex items-center gap-4 p-2">
+                <CardContent className="flex items-center gap-3 p-2">
                     <AlbumArt src={song.albumArtUrl} alt={song.title} className="w-12 h-12" />
-                    <div className="flex-1 overflow-hidden">
+                    <div className="flex-1 min-w-0">
                         <p className="font-medium truncate">{song.title}</p>
                         <p className="text-sm text-muted-foreground truncate">{song.artist}</p>
                     </div>
@@ -152,7 +152,9 @@ export function SongList({ songs, playlistId }: SongListProps) {
                 </div>
               </TableCell>
               <TableCell className="font-medium">
-                <div>{song.title}</div>
+                <div className="min-w-0">
+                    <p className="truncate">{song.title}</p>
+                </div>
               </TableCell>
               <TableCell className="text-muted-foreground hidden md:table-cell">{song.artist}</TableCell>
               <TableCell className="text-muted-foreground capitalize hidden lg:table-cell">{song.genre}</TableCell>
@@ -172,7 +174,7 @@ export function SongList({ songs, playlistId }: SongListProps) {
 
   return (
     <>
-      <div className="md:p-6">
+      <div className="p-0 sm:p-4 md:p-6">
         {isMobile ? renderMobileList() : renderDesktopTable()}
       </div>
       {songToEdit && (

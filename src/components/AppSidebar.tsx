@@ -48,14 +48,14 @@ export function AppSidebar({ onSelectPlaylist }: AppSidebarProps) {
 
   return (
     <div className="flex flex-col h-full p-2 md:p-4">
-      <div className="flex items-center gap-2 mb-8 px-2 pt-4">
+      <div className="flex items-center gap-2 mb-4 px-2 pt-4 md:mb-8">
         <Headphones className="w-8 h-8 text-accent" />
         <h1 className="text-2xl font-bold text-foreground font-headline group-data-[collapsible=icon]:hidden">
           Harmony Hub
         </h1>
       </div>
 
-      <nav className="flex flex-col gap-2 mb-6">
+      <nav className="flex flex-col gap-2 mb-4">
         <Link href="/" passHref>
           <Button
             variant={pathname === '/' ? 'secondary' : 'ghost'}
