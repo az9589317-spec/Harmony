@@ -68,7 +68,7 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
 }) => {
   const { user } = useUser();
   const firestore = useFirestore();
-  const { firebaseApp } = useFirebaseApp();
+  const firebaseApp = useFirebaseApp();
 
   const songsRef = useMemoFirebase(
     () => (user ? collection(firestore, 'users', user.uid, 'songs') : null),
@@ -146,7 +146,7 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
     },
     [activePlaylistId, getPlaylistSongs]
   );
-
+  
   const playNext = useCallback(() => {
     if (currentTrackIndexInPlaylist === null) return;
     const nextIndex =
@@ -209,7 +209,7 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   const addSong = (file: File, userId: string): string => {
-    if (!userId) return '';
+    if (!userId || !firebaseApp) return '';
 
     const taskId = uuidv4();
     const songId = uuidv4();
@@ -289,7 +289,7 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
       audioRef.current.pause();
       setIsPlaying(false);
     } else {
-      audio_ref.current
+      audioRef.current
         .play()
         .then(() => setIsPlaying(true))
         .catch((e) => console.error('Playback failed', e));
