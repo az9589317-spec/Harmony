@@ -1,6 +1,6 @@
 'use client';
 
-import { useUser, useFirestore } from '@/firebase';
+import { useUser, useFirestore, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, useRef } from 'react';
 import { collection, addDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
@@ -110,12 +110,12 @@ export default function CommunityPage() {
     if ((!postContent.trim() && !postImage) || !user || !firestore || !formRef.current) return;
     
     setIsSubmitting(true);
+    
     try {
         let imageUrl: string | undefined = undefined;
 
         if (postImage) {
             const formData = new FormData(formRef.current);
-            // Ensure file is appended if not already there from form
             if (!formData.has('file') && postImage) {
               formData.append('file', postImage);
             }
@@ -126,28 +126,40 @@ export default function CommunityPage() {
             }
             imageUrl = result.url;
         }
+      
+        const newPostData = {
+          userId: user.uid,
+          username: user.displayName || 'Anonymous',
+          userImage: user.photoURL || null,
+          content: postContent.trim(),
+          createdAt: serverTimestamp(),
+          ...(imageUrl && { imageUrl }),
+        };
 
-      await addDoc(collection(firestore, 'posts'), {
-        userId: user.uid,
-        username: user.displayName || 'Anonymous',
-        userImage: user.photoURL || null,
-        content: postContent.trim(),
-        createdAt: serverTimestamp(),
-        ...(imageUrl && { imageUrl }),
-      });
-      setPostContent('');
-      removeImage();
+        const postsCollection = collection(firestore, 'posts');
+        
+        addDoc(postsCollection, newPostData)
+          .then(() => {
+            setPostContent('');
+            removeImage();
+            setIsSubmitting(false);
+          })
+          .catch((serverError) => {
+            const permissionError = new FirestorePermissionError({
+              path: postsCollection.path,
+              operation: 'create',
+              requestResourceData: newPostData,
+            });
+            errorEmitter.emit('permission-error', permissionError);
+            setIsSubmitting(false); // Make sure to stop submitting on error
+          });
+
     } catch (error: any) {
-        console.error("Post submission error:", error);
-        console.error("Error name:", error.name);
-        console.error("Error message:", error.message);
-        console.error("Error stack:", error.stack);
         toast({
             variant: 'destructive',
             title: 'Failed to post',
             description: error.message || 'An error occurred. Please try again.',
         });
-    } finally {
         setIsSubmitting(false);
     }
   };
