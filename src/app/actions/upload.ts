@@ -1,7 +1,6 @@
 'use server'
 
 import ImageKit from 'imagekit';
-import { Buffer } from 'buffer';
 
 export async function uploadMedia(formData: FormData, mediaType: 'image' | 'audio' | 'video') {
     try {
