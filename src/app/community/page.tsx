@@ -165,11 +165,11 @@ export default function CommunityPage() {
   );
   const { data: posts, isLoading: isPostsLoading } = useCollection<Post>(postsQuery);
 
-  // useEffect(() => {
-  //   if (!isUserLoading && !user) {
-  //     router.push('/login');
-  //   }
-  // }, [user, isUserLoading, router]);
+  useEffect(() => {
+    if (!isUserLoading && !user) {
+      router.push('/login');
+    }
+  }, [user, isUserLoading, router]);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -250,13 +250,13 @@ export default function CommunityPage() {
     }
   };
 
-  // if (isUserLoading) {
-  //   return (
-  //     <div className="flex items-center justify-center h-screen">
-  //       <Loader2 className="h-8 w-8 animate-spin" />
-  //     </div>
-  //   );
-  // }
+  if (isUserLoading || !user) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <SidebarProvider>
@@ -330,4 +330,3 @@ export default function CommunityPage() {
     </SidebarProvider>
   );
 }
- 
