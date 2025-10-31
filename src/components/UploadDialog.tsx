@@ -81,6 +81,7 @@ export function UploadDialog() {
               duration: duration,
               genre: genreResponse.genre || 'Unknown',
               albumArtUrl: randomAlbumArt,
+              userId: user.uid, // Pass the user ID
             };
 
             await addSong(newSong, file);
