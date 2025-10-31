@@ -68,12 +68,9 @@ export default function CommunityPage() {
   const imagekit = useMemo(() => {
     if (typeof window === 'undefined') return null;
     return new ImageKit({
-        publicKey: "public_1Z4y6xViWvq28fxsG8fPbD4BZGY=",
-        urlEndpoint: "https://ik.imagekit.io/c9okxuh0pu",
-        // IMPORTANT: This authentication endpoint is a placeholder.
-        // You MUST create your own backend server to securely generate
-        // the authentication parameters.
-        authenticationEndpoint: "https://your-authentication-server.com/api/imagekit/auth"
+        publicKey: process.env.NEXT_PUBLIC_IMAGEKIT_PUBLIC_KEY!,
+        urlEndpoint: process.env.NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT!,
+        authenticationEndpoint: "/api/imagekit/auth"
     });
   }, []);
 
@@ -140,7 +137,7 @@ export default function CommunityPage() {
         toast({
             variant: 'destructive',
             title: 'Failed to post',
-            description: error.message || 'An error occurred during upload. Please ensure your authentication server is running.',
+            description: error.message || 'An error occurred during upload. Please try again.',
         });
     } finally {
         setIsSubmitting(false);
