@@ -3,6 +3,8 @@
 import type { Song, Playlist } from '@/lib/types';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import React, { createContext, useContext, useState, useRef, useEffect, useCallback } from 'react';
+import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { collection, doc, setDoc, deleteDoc, writeBatch } from 'firebase/firestore';
 
 interface MusicPlayerContextType {
   songs: Song[];
@@ -14,7 +16,7 @@ interface MusicPlayerContextType {
   duration: number;
   volume: number;
   activePlaylistId: string;
-  addSong: (song: Song) => void;
+  addSong: (song: Omit<Song, 'id' | 'userId'> & { id?: string }) => void;
   playTrack: (trackIndex: number, playlistId?: string) => void;
   togglePlayPause: () => void;
   playNext: () => void;
@@ -30,19 +32,16 @@ interface MusicPlayerContextType {
 
 const MusicPlayerContext = createContext<MusicPlayerContextType | undefined>(undefined);
 
-const initialSongs: Song[] = [
-    { id: '1', title: 'Midnight City', artist: 'M83', url: '', duration: 243, genre: 'Synth-pop', albumArtUrl: PlaceHolderImages[0].imageUrl },
-    { id: '2', title: 'Bohemian Rhapsody', artist: 'Queen', url: '', duration: 355, genre: 'Rock', albumArtUrl: PlaceHolderImages[1].imageUrl },
-    { id: '3', title: 'Take Five', artist: 'Dave Brubeck', url: '', duration: 324, genre: 'Jazz', albumArtUrl: PlaceHolderImages[2].imageUrl },
-];
-
-
 export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [songs, setSongs] = useState<Song[]>(initialSongs);
-  const [playlists, setPlaylists] = useState<Playlist[]>([
-      { id: 'library', name: 'Library', songIds: initialSongs.map(s => s.id) },
-      { id: 'favorites', name: 'Favorites', songIds: [initialSongs[0].id] },
-  ]);
+  const { user } = useUser();
+  const firestore = useFirestore();
+
+  const songsRef = useMemoFirebase(() => user ? collection(firestore, 'users', user.uid, 'songs') : null, [firestore, user]);
+  const { data: songs = [], isLoading: songsLoading } = useCollection<Song>(songsRef);
+
+  const playlistsRef = useMemoFirebase(() => user ? collection(firestore, 'users', user.uid, 'playlists') : null, [firestore, user]);
+  const { data: playlistsData, isLoading: playlistsLoading } = useCollection<Playlist>(playlistsRef);
+
   const [activePlaylistId, setActivePlaylistId] = useState('library');
   const [currentTrackIndexInPlaylist, setCurrentTrackIndexInPlaylist] = useState<number | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -50,6 +49,16 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const [duration, setDuration] = useState(0);
   const [volume, setVolumeState] = useState(0.8);
   const audioRef = useRef<HTMLAudioElement>(null);
+
+  const playlists: Playlist[] = useMemo(() => {
+    const userPlaylists = playlistsData || [];
+    const libraryPlaylist: Playlist = {
+      id: 'library',
+      name: 'My Library',
+      songIds: songs.map(s => s.id),
+    };
+    return [libraryPlaylist, ...userPlaylists];
+  }, [playlistsData, songs]);
 
   const getPlaylistSongs = useCallback((playlistId: string): Song[] => {
     const playlist = playlists.find(p => p.id === playlistId);
@@ -79,9 +88,17 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({ c
     };
   }, [currentTrack]);
 
-  const addSong = (song: Song) => {
-    setSongs(prev => [...prev, song]);
-    setPlaylists(prev => prev.map(p => p.id === 'library' ? { ...p, songIds: [...p.songIds, song.id] } : p));
+  const addSong = async (song: Omit<Song, 'id'|'userId'|'url'> & {url: string, id?: string}) => {
+    if (!user) return;
+    const songId = song.id || doc(collection(firestore, 'temp')).id;
+    const songRef = doc(firestore, 'users', user.uid, 'songs', songId);
+    const newSong: Song = { 
+        ...song, 
+        id: songId, 
+        userId: user.uid, 
+        albumArtUrl: song.albumArtUrl || PlaceHolderImages[Math.floor(Math.random() * PlaceHolderImages.length)].imageUrl
+    };
+    await setDoc(songRef, newSong);
   };
   
   const playTrack = (trackIndexInPlaylist: number, playlistId: string = activePlaylistId) => {
@@ -111,13 +128,13 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const playNext = useCallback(() => {
     if (currentTrackIndexInPlaylist === null) return;
     const nextIndex = (currentTrackIndexInPlaylist + 1) % activePlaylistSongs.length;
-    playTrack(nextIndex);
-  }, [currentTrackIndexInPlaylist, activePlaylistSongs.length]);
+    playTrack(nextIndex, activePlaylistId);
+  }, [currentTrackIndexInPlaylist, activePlaylistSongs.length, activePlaylistId]);
 
   const playPrevious = () => {
     if (currentTrackIndexInPlaylist === null) return;
     const prevIndex = (currentTrackIndexInPlaylist - 1 + activePlaylistSongs.length) % activePlaylistSongs.length;
-    playTrack(prevIndex);
+    playTrack(prevIndex, activePlaylistId);
   };
   
   const seek = (time: number) => {
@@ -134,18 +151,21 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({ c
     }
   };
   
-  const createPlaylist = (name: string) => {
-      const newPlaylist: Playlist = { id: Date.now().toString(), name, songIds: [] };
-      setPlaylists(prev => [...prev, newPlaylist]);
+  const createPlaylist = async (name: string) => {
+    if (!user) return;
+    const playlistId = doc(collection(firestore, 'temp')).id;
+    const playlistRef = doc(firestore, 'users', user.uid, 'playlists', playlistId);
+    const newPlaylist: Playlist = { id: playlistId, name, songIds: [] };
+    await setDoc(playlistRef, newPlaylist);
   };
   
-  const addSongToPlaylist = (songId: string, playlistId: string) => {
-      setPlaylists(prev => prev.map(p => {
-          if (p.id === playlistId && !p.songIds.includes(songId)) {
-              return { ...p, songIds: [...p.songIds, songId] };
-          }
-          return p;
-      }));
+  const addSongToPlaylist = async (songId: string, playlistId: string) => {
+    if (!user || playlistId === 'library') return;
+    const playlist = playlists.find(p => p.id === playlistId);
+    if (playlist && !playlist.songIds.includes(songId)) {
+      const playlistRef = doc(firestore, 'users', user.uid, 'playlists', playlistId);
+      await setDoc(playlistRef, { songIds: [...playlist.songIds, songId] }, { merge: true });
+    }
   };
 
   return (
@@ -159,7 +179,7 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({ c
       duration,
       volume,
       activePlaylistId,
-      addSong,
+      addSong: addSong as any, //TODO: Fix type
       playTrack,
       togglePlayPause,
       playNext,

@@ -18,9 +18,11 @@ import { classifyMusicGenre } from '@/ai/flows/ai-classify-uploaded-music';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Upload } from 'lucide-react';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
+import { useUser } from '@/firebase';
 
 export function UploadDialog() {
   const { addSong } = useMusicPlayer();
+  const { user } = useUser();
   const { toast } = useToast();
   const [file, setFile] = useState<File | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -44,11 +46,11 @@ export function UploadDialog() {
   }
 
   const handleSubmit = async () => {
-    if (!file) {
+    if (!file || !user) {
         toast({
             variant: "destructive",
-            title: "No file selected",
-            description: "Please choose a music file to upload.",
+            title: "Upload Error",
+            description: !file ? "Please choose a music file to upload." : "You must be logged in to upload.",
         });
         return;
     }
@@ -69,16 +71,16 @@ export function UploadDialog() {
         const randomAlbumArt = PlaceHolderImages[Math.floor(Math.random() * PlaceHolderImages.length)].imageUrl;
 
         const newSong = {
-          id: Date.now().toString(),
           title: file.name.replace(/\.[^/.]+$/, ""),
           artist: 'Unknown Artist',
           url: URL.createObjectURL(file),
           duration: duration,
           genre: genreResponse.genre || 'Unknown',
-          albumArtUrl: randomAlbumArt
+          albumArtUrl: randomAlbumArt,
+          userId: user.uid,
         };
 
-        addSong(newSong);
+        await addSong(newSong as any);
         toast({
           title: "Song Uploaded!",
           description: `"${newSong.title}" was added to your library.`,
