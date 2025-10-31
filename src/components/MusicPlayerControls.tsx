@@ -3,7 +3,7 @@
 import { useMusicPlayer } from '@/contexts/MusicPlayerContext';
 import { Button } from './ui/button';
 import { Slider } from './ui/slider';
-import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX } from 'lucide-react';
+import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Music } from 'lucide-react';
 import { AlbumArt } from './AlbumArt';
 
 function formatDuration(seconds: number) {
@@ -36,34 +36,36 @@ export function MusicPlayerControls() {
   }
 
   return (
-    <footer className="h-24 bg-card border-t shrink-0 p-4 flex items-center gap-6 z-10 shadow-lg">
-      <div className="flex items-center gap-4 w-64">
+    <footer className="h-24 bg-card border-t shrink-0 p-2 sm:p-4 flex items-center gap-2 sm:gap-6 z-10 shadow-inner">
+      <div className="flex items-center gap-2 sm:gap-4 w-32 sm:w-64">
         {currentTrack ? (
           <>
-            <AlbumArt src={currentTrack.albumArtUrl} alt={currentTrack.title} className="w-14 h-14" />
-            <div>
+            <AlbumArt src={currentTrack.albumArtUrl} alt={currentTrack.title} className="w-10 h-10 sm:w-14 sm:h-14" />
+            <div className="hidden sm:block">
               <p className="font-semibold text-sm truncate">{currentTrack.title}</p>
               <p className="text-xs text-muted-foreground truncate">{currentTrack.artist}</p>
             </div>
           </>
         ) : (
-          <div className="flex items-center gap-4">
-             <div className="w-14 h-14 bg-muted rounded-md"></div>
-             <div>
-                <p className="font-semibold text-sm">No song selected</p>
-                <p className="text-xs text-muted-foreground">Select a song to play</p>
+          <div className="flex items-center gap-2 sm:gap-4">
+             <div className="w-10 h-10 sm:w-14 sm:h-14 bg-muted rounded-md flex items-center justify-center">
+                <Music className="w-6 h-6 text-muted-foreground"/>
+             </div>
+             <div className="hidden sm:block">
+                <p className="font-semibold text-sm">No song</p>
+                <p className="text-xs text-muted-foreground">Select a song</p>
              </div>
           </div>
         )}
       </div>
 
       <div className="flex-1 flex flex-col items-center gap-2">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 sm:gap-4">
           <Button variant="ghost" size="icon" onClick={playPrevious} disabled={!currentTrack}>
             <SkipBack className="h-5 w-5" />
           </Button>
-          <Button variant="default" size="icon" className="w-12 h-12 rounded-full" onClick={togglePlayPause} disabled={!currentTrack}>
-            {isPlaying ? <Pause className="h-6 w-6" fill="currentColor"/> : <Play className="h-6 w-6" fill="currentColor"/>}
+          <Button variant="default" size="icon" className="w-10 h-10 sm:w-12 sm:h-12 rounded-full" onClick={togglePlayPause} disabled={!currentTrack}>
+            {isPlaying ? <Pause className="h-5 w-5 sm:h-6 sm:w-6" fill="currentColor"/> : <Play className="h-5 w-5 sm:h-6 sm-w-6" fill="currentColor"/>}
           </Button>
           <Button variant="ghost" size="icon" onClick={playNext} disabled={!currentTrack}>
             <SkipForward className="h-5 w-5" />
@@ -82,7 +84,7 @@ export function MusicPlayerControls() {
         </div>
       </div>
 
-      <div className="flex items-center gap-2 w-48">
+      <div className="hidden md:flex items-center gap-2 w-32 sm:w-48">
         <Button variant="ghost" size="icon" onClick={() => setVolume(volume > 0 ? 0 : 0.5)}>
             {volume === 0 ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
         </Button>

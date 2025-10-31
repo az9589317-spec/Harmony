@@ -7,7 +7,7 @@ import { AppSidebar } from '@/components/AppSidebar';
 import { SongList } from '@/components/SongList';
 import { MusicPlayerControls } from '@/components/MusicPlayerControls';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Separator } from './ui/separator';
+import { SidebarProvider, Sidebar, SidebarInset } from './ui/sidebar';
 
 export function HarmonyHubClient() {
   const { songs, playlists, getPlaylistSongs, activePlaylistId, setActivePlaylistId } = useMusicPlayer();
@@ -19,7 +19,9 @@ export function HarmonyHubClient() {
     let currentSongs = getPlaylistSongs(activePlaylistId);
 
     if (searchTerm) {
-      return songs.filter(song =>
+      // When searching, search across all songs in the library
+      const librarySongs = getPlaylistSongs('library');
+      return librarySongs.filter(song =>
         song.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
         song.artist.toLowerCase().includes(searchTerm.toLowerCase()) ||
         song.genre.toLowerCase().includes(searchTerm.toLowerCase())
@@ -30,15 +32,6 @@ export function HarmonyHubClient() {
   
   const handleSearchChange = (term: string) => {
     setSearchTerm(term);
-    if (term) {
-        // Switch to a virtual 'search' view if user starts typing
-        // This is a UI-only switch, context's active playlist for playback remains
-    } else {
-        // Revert to library view when search is cleared
-        if (activePlaylistId !== 'library' && !playlists.find(p => p.id === activePlaylistId)) {
-             setActivePlaylistId('library');
-        }
-    }
   };
 
   const handleSelectPlaylist = (playlistId: string) => {
@@ -46,24 +39,32 @@ export function HarmonyHubClient() {
     setActivePlaylistId(playlistId);
   }
 
-  const playlistName = searchTerm ? `Search results for "${searchTerm}"` : activePlaylist?.name || 'Music';
+  const playlistName = useMemo(() => {
+    if (searchTerm) {
+      return `Search Results`;
+    }
+    return activePlaylist?.name || 'Music';
+  }, [searchTerm, activePlaylist]);
 
   return (
-    <div className="h-screen w-full flex flex-col bg-card overflow-hidden">
-      <div className="flex flex-1 overflow-hidden">
-        <AppSidebar onSelectPlaylist={handleSelectPlaylist} />
-        <main className="flex-1 flex flex-col overflow-hidden">
-          <AppHeader 
-            playlistName={playlistName}
-            onSearchChange={handleSearchChange}
-          />
-          <Separator />
-          <ScrollArea className="flex-1">
-            <SongList songs={songsToDisplay} playlistId={activePlaylistId} />
-          </ScrollArea>
-        </main>
+    <SidebarProvider>
+      <div className="h-screen w-full flex flex-col bg-card overflow-hidden">
+        <div className="flex flex-1 overflow-hidden">
+          <Sidebar>
+            <AppSidebar onSelectPlaylist={handleSelectPlaylist} />
+          </Sidebar>
+          <SidebarInset className="flex flex-col overflow-hidden !m-0 !rounded-none !shadow-none">
+            <AppHeader 
+              playlistName={playlistName}
+              onSearchChange={handleSearchChange}
+            />
+            <ScrollArea className="flex-1">
+              <SongList songs={songsToDisplay} playlistId={activePlaylistId} />
+            </ScrollArea>
+          </SidebarInset>
+        </div>
+        <MusicPlayerControls />
       </div>
-      <MusicPlayerControls />
-    </div>
+    </SidebarProvider>
   );
 }

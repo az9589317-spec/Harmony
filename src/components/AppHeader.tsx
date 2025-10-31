@@ -1,8 +1,8 @@
 "use client";
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Input } from '@/components/ui/input';
-import { Search, LogOut } from 'lucide-react';
+import { Search, LogOut, PanelLeft, Music } from 'lucide-react';
 import { UploadDialog } from './UploadDialog';
 import { useUser, useAuth } from '@/firebase';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
@@ -17,6 +17,8 @@ import {
 import { Button } from './ui/button';
 import { signOut } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
+import { useSidebar } from './ui/sidebar';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 
 interface AppHeaderProps {
@@ -28,6 +30,9 @@ export function AppHeader({ playlistName, onSearchChange }: AppHeaderProps) {
   const { user } = useUser();
   const auth = useAuth();
   const router = useRouter();
+  const { toggleSidebar } = useSidebar();
+  const isMobile = useIsMobile();
+  const [isSearchVisible, setIsSearchVisible] = useState(false);
 
   const handleLogout = async () => {
     await signOut(auth);
@@ -39,20 +44,58 @@ export function AppHeader({ playlistName, onSearchChange }: AppHeaderProps) {
     return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
   }
 
+  const toggleSearch = () => {
+    setIsSearchVisible(!isSearchVisible);
+  }
+
   return (
-    <header className="flex h-16 items-center justify-between gap-4 px-6 shrink-0">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight font-headline">{playlistName}</h1>
+    <header className="flex h-16 items-center justify-between gap-4 px-4 sm:px-6 shrink-0 border-b">
+      <div className="flex items-center gap-2">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="md:hidden"
+          onClick={toggleSidebar}
+        >
+          <PanelLeft className="h-5 w-5" />
+          <span className="sr-only">Toggle Sidebar</span>
+        </Button>
+        
+        {isMobile && isSearchVisible ? (
+           <div className="relative w-full">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+             <Input
+               placeholder="Search..."
+               className="pl-9 w-full bg-background"
+               onChange={(e) => onSearchChange(e.target.value)}
+               autoFocus
+               onBlur={() => setIsSearchVisible(false)}
+             />
+           </div>
+        ) : (
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight font-headline truncate max-w-[150px] sm:max-w-xs">
+            {playlistName}
+          </h1>
+        )}
       </div>
-      <div className="flex items-center gap-4">
-        <div className="relative w-64">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search songs, artists, genres..."
-            className="pl-9"
-            onChange={(e) => onSearchChange(e.target.value)}
-          />
-        </div>
+
+      <div className="flex items-center gap-2 sm:gap-4">
+        {!isSearchVisible && (
+          <div className="hidden md:flex relative w-64">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search songs, artists..."
+              className="pl-9"
+              onChange={(e) => onSearchChange(e.target.value)}
+            />
+          </div>
+        )}
+
+        <Button variant="ghost" size="icon" className="md:hidden" onClick={toggleSearch}>
+            <Search className="h-5 w-5" />
+            <span className="sr-only">Search</span>
+        </Button>
+
         {user && <UploadDialog />}
         
         {user && (
