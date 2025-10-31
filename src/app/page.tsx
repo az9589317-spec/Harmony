@@ -7,7 +7,7 @@ import { MusicPlayerProvider } from '@/contexts/MusicPlayerContext';
 import { HarmonyHubClient } from '@/components/HarmonyHubClient';
 import { Loader2 } from 'lucide-react';
 
-export default function Home() {
+export default function MusicPage() {
   const { user, isUserLoading } = useUser();
   const router = useRouter();
 
@@ -26,8 +26,8 @@ export default function Home() {
   }
 
   return (
-    <MusicPlayerProvider>
-      <HarmonyHubClient />
-    </MusicPlayerProvider>
+    <HarmonyHubClient />
   );
 }
+
+    

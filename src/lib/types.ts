@@ -22,3 +22,14 @@ export interface UploadTask {
   status: 'uploading' | 'processing' | 'success' | 'error';
   error?: string;
 }
+
+export interface Post {
+  id: string;
+  userId: string;
+  username: string; // Denormalized for easy display
+  userImage: string | null; // Denormalized for easy display
+  content: string;
+  createdAt: string; // ISO 8601 string
+}
+
+    

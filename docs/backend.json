@@ -126,6 +126,37 @@
         "createdAt",
         "songIds"
       ]
+    },
+    "Post": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Post",
+      "type": "object",
+      "description": "Represents a user-created post in the community feed.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Post entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to the User who created the post."
+        },
+        "content": {
+          "type": "string",
+          "description": "The text content of the post."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the post was created.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "content",
+        "createdAt"
+      ]
     }
   },
   "auth": {
@@ -191,8 +222,25 @@
             }
           ]
         }
+      },
+      {
+        "path": "/posts/{postId}",
+        "definition": {
+          "entityName": "Post",
+          "schema": {
+            "$ref": "#/backend/entities/Post"
+          },
+          "description": "Stores all posts from all users in a single collection for easy querying of the community feed.",
+          "params": [
+            {
+              "name": "postId",
+              "description": "The unique identifier of the post."
+            }
+          ]
+        }
       }
     ],
-    "reasoning": "The Firestore data structure is designed to support the Harmony Hub application, focusing on user authentication, song uploads, and playlist management. It prioritizes security, scalability, and debuggability by adhering to the principles of Authorization Independence, Structural Segregation, and Access Modeling. Path-based ownership is used for private user data, while membership maps are used for collaborative data (although collaborative data is not explicitly present in the requirements). Explicit state modeling (if applicable in the future) and predictable schema patterns enhance debuggability.\n\nAuthorization Independence is achieved primarily through path-based ownership for songs. Each user has their own collection of songs under `/users/{userId}/songs/{songId}`. Security rules can then directly check `request.auth.uid == userId` without needing to `get()` parent documents.  This enables atomic operations and simplifies security rules.\n\nStructural Segregation is applied by storing each user's songs in a dedicated subcollection under their user document (`/users/{userId}/songs`). This ensures that security rules for song access are consistent within the collection.  User data is stored at `/users/{userId}`, and roles (if implemented) would be in dedicated collections, further separating concerns.\n\nThe structure also supports QAPs. Listing songs is restricted to the owning user via the `/users/{userId}/songs` path, ensuring that users can only access their own data. The use of dedicated collections for different entity types prevents mixing data with different access requirements."
+    "reasoning": "The Firestore data structure is designed to support the Harmony Hub application, focusing on user authentication, song uploads, and playlist management. It prioritizes security, scalability, and debuggability by adhering to the principles of Authorization Independence, Structural Segregation, and Access Modeling. Path-based ownership is used for private user data, while a root collection for posts allows for a global community feed. Explicit state modeling (if applicable in the future) and predictable schema patterns enhance debuggability.\n\nAuthorization Independence is achieved primarily through path-based ownership for songs. Each user has their own collection of songs under `/users/{userId}/songs/{songId}`. Security rules can then directly check `request.auth.uid == userId` without needing to `get()` parent documents. This enables atomic operations and simplifies security rules.\n\nStructural Segregation is applied by storing each user's songs in a dedicated subcollection under their user document (`/users/{userId}/songs`). This ensures that security rules for song access are consistent within the collection. User data is stored at `/users/{userId}`. Posts are stored in a root collection `/posts` to allow all users to read them for a community feed, while write access is restricted to the post owner."
   }
 }
+    

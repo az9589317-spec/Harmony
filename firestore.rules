@@ -9,19 +9,29 @@
  * - /users/{userId}: Stores user profiles.
  * - /users/{userId}/songs/{songId}: Stores songs uploaded by each user.
  * - /users/{userId}/playlists/{playlistId}: Stores playlists created by each user.
+ * - /posts/{postId}: Stores all posts for the community feed.
  *
  * Key Security Decisions:
- * - Users can only access their own songs and playlists.
+ * - Users can only create, update, or delete their own data (songs, playlists, posts).
+ * - Anyone can read posts in the community feed.
  * - User listing is disallowed for privacy.
  * - All write operations require authentication.
  *
  * Denormalization for Authorization:
- * - The `userId` is embedded in the song and playlist paths to enforce user-ownership.
+ * - The `userId` is embedded in song, playlist, and post documents to enforce user-ownership.
  *   This allows security rules to efficiently verify ownership without additional `get()` calls.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
 
     /**
      * @description Protects the /users collection, allowing only authenticated users to create their own profile.
@@ -32,18 +42,10 @@ service cloud.firestore {
      * @principle Enforces user-ownership; authenticated user can create only their own profile.
      */
     match /users/{userId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      function isOwner(userId) {
-        return request.auth.uid == userId;
-      }
-
       allow create: if isSignedIn() && isOwner(userId) && request.resource.data.id == userId;
-      allow get: if false;
-      allow list: if false;
-      allow update: if false;
+      allow get: if false; // Disallow reading other user profiles for privacy
+      allow list: if false; // Disallow listing all users
+      allow update: if false; // Updates handled via specific functions/paths if needed
       allow delete: if false;
     }
 
@@ -56,23 +58,14 @@ service cloud.firestore {
      * @principle Enforces strict user-ownership for song management.
      */
     match /users/{userId}/songs/{songId} {
-      function isSignedIn() {
-        return request.auth != null;
+      function isExistingOwner() {
+          return isOwner(userId) && resource != null;
       }
-
-      function isOwner(userId) {
-        return request.auth.uid == userId;
-      }
-
-        function isExistingOwner(userId) {
-            return isOwner(userId) && resource != null;
-        }
-
       allow create: if isSignedIn() && isOwner(userId) && request.resource.data.userId == userId;
       allow get: if isSignedIn() && isOwner(userId);
       allow list: if isSignedIn() && isOwner(userId);
-      allow update: if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId;
-      allow delete: if isExistingOwner(userId);
+      allow update: if isSignedIn() && isExistingOwner() && request.resource.data.userId == resource.data.userId;
+      allow delete: if isSignedIn() && isExistingOwner();
     }
 
     /**
@@ -84,23 +77,39 @@ service cloud.firestore {
      * @principle Enforces strict user-ownership for playlist management.
      */
     match /users/{userId}/playlists/{playlistId} {
-        function isSignedIn() {
-            return request.auth != null;
-        }
-
-        function isOwner(userId) {
-            return request.auth.uid == userId;
-        }
-
-        function isExistingOwner(userId) {
+        function isExistingOwner() {
             return isOwner(userId) && resource != null;
         }
 
         allow create: if isSignedIn() && isOwner(userId) && request.resource.data.userId == userId;
         allow get: if isSignedIn() && isOwner(userId);
         allow list: if isSignedIn() && isOwner(userId);
-        allow update: if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId;
-        allow delete: if isExistingOwner(userId);
+        allow update: if isSignedIn() && isExistingOwner() && request.resource.data.userId == resource.data.userId;
+        allow delete: if isSignedIn() && isExistingOwner();
+    }
+
+    /**
+     * @description Manages the /posts collection for the community feed.
+     * @path /posts/{postId}
+     * @allow (list, get) Any authenticated user can read posts for the community feed.
+     * @allow (create) Authenticated users can create posts.
+     * @allow (update, delete) Only the owner of the post can update or delete it.
+     * @principle Allows a public read feed while restricting write access to owners.
+     */
+    match /posts/{postId} {
+      function isPostOwner() {
+        // For reads on an existing document
+        return request.auth.uid == resource.data.userId;
+      }
+
+       function isNewPostOwner() {
+        // For a create operation
+        return request.auth.uid == request.resource.data.userId;
+      }
+
+      allow list, get: if isSignedIn();
+      allow create: if isSignedIn() && isNewPostOwner();
+      allow update, delete: if isSignedIn() && isPostOwner();
     }
   }
 }
@@ -112,3 +121,5 @@ service firebase.storage {
     }
   }
 }
+
+    
