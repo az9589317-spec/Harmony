@@ -1,3 +1,5 @@
+import { FieldValue } from "firebase/firestore";
+
 export interface Song {
   id: string;
   title: string;
@@ -29,6 +31,6 @@ export interface Post {
   username: string; // Denormalized for easy display
   userImage: string | null; // Denormalized for easy display
   content: string;
-  createdAt: string; // ISO 8601 string
+  createdAt: string; // ISO 8601 string, or FieldValue for server-side timestamp
   imageUrl?: string; // Optional image URL
 }

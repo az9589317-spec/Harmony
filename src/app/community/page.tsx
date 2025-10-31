@@ -128,7 +128,7 @@ export default function CommunityPage() {
         username: user.displayName || 'Anonymous',
         userImage: user.photoURL || null,
         content: postContent.trim(),
-        createdAt: new Date().toISOString(),
+        createdAt: serverTimestamp(),
         ...(imageUrl && { imageUrl }),
       });
       setPostContent('');
