@@ -1,3 +1,28 @@
 {
-  "placeholderImages": []
+  "placeholderImages": [
+    {
+      "id": "album-art-1",
+      "description": "Abstract sound waves",
+      "imageUrl": "https://images.unsplash.com/photo-1667236449230-3f6e5fb982a1?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxMHx8YWJzdHJhY3QlMjBtdXNpY3xlbnwwfHx8fDE3NjE5MDMzNTR8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "abstract music"
+    },
+    {
+      "id": "album-art-2",
+      "description": "Neon equalizer display",
+      "imageUrl": "https://images.unsplash.com/photo-1606414761374-3bbc2d59a0a4?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw3fHxuZW9uJTIwZXF1YWxpemVyfGVufDB8fHx8MTc2MTkwNDQyOXww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "neon equalizer"
+    },
+    {
+      "id": "album-art-3",
+      "description": "Vinyl record on a player",
+      "imageUrl": "https://images.unsplash.com/photo-1645523906730-894addb64d64?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxMHx8dmlueWwlMjByZWNvcmR8ZW58MHx8fHwxNzYxODQ4NzQ2fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "vinyl record"
+    },
+    {
+      "id": "album-art-4",
+      "description": "Minimalist geometric pattern",
+      "imageUrl": "https://images.unsplash.com/photo-1531265726475-52ad60219627?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxMHx8bWluaW1hbGlzdCUyMHBhdHRlcm58ZW58MHx8fHwxNzYxODQ4MDY0fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "minimalist pattern"
+    }
+  ]
 }
