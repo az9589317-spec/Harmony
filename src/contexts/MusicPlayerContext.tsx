@@ -45,7 +45,7 @@ interface MusicPlayerContextType {
   duration: number;
   volume: number;
   activePlaylistId: string;
-  addSong: (file: File, userId: string) => void;
+  addSong: (file: File, userId: string) => string; // Returns taskId
   playTrack: (trackIndex: number, playlistId?: string) => void;
   togglePlayPause: () => void;
   playNext: () => void;
@@ -133,8 +133,8 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
       const track = targetPlaylistSongs[trackIndexInPlaylist];
 
       if (track && audioRef.current) {
-        if (track.url) {
-          audioRef.current.src = track.url;
+        if (track.fileUrl) {
+          audioRef.current.src = track.fileUrl;
           audioRef.current.crossOrigin = 'anonymous';
         }
         setCurrentTrackIndexInPlaylist(trackIndexInPlaylist);
@@ -208,8 +208,8 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
     });
   };
 
-  const addSong = async (file: File, userId: string) => {
-    if (!userId) return;
+  const addSong = (file: File, userId: string): string => {
+    if (!userId) return '';
 
     const taskId = uuidv4();
     const songId = uuidv4();
@@ -258,7 +258,7 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
             userId: userId,
             title: file.name.replace(/\.[^/.]+$/, ''),
             artist: 'Unknown Artist',
-            url: downloadURL,
+            fileUrl: downloadURL,
             duration: duration,
             genre: genreResponse.genre || 'Unknown',
             albumArtUrl: randomAlbumArt,
@@ -268,10 +268,6 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
           await setDoc(songRef, newSong);
     
           updateTaskProgress(taskId, { status: 'success' });
-          
-          setTimeout(() => {
-            setUploadTasks((prev) => prev.filter((t) => t.id !== taskId));
-          }, 5000);
         }
       );
     } catch (error) {
@@ -284,6 +280,7 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
             : 'Unknown error during upload.',
       });
     }
+    return taskId;
   };
 
   const togglePlayPause = () => {
@@ -292,7 +289,7 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
       audioRef.current.pause();
       setIsPlaying(false);
     } else {
-      audioRef.current
+      audio_ref.current
         .play()
         .then(() => setIsPlaying(true))
         .catch((e) => console.error('Playback failed', e));

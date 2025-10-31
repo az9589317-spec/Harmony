@@ -16,7 +16,7 @@ import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from './ui/scroll-area';
 import { useSidebar } from './ui/sidebar';
-import { UploadProgress } from './UploadProgress';
+
 
 interface AppSidebarProps {
   onSelectPlaylist: (playlistId: string) => void;
@@ -85,10 +85,6 @@ export function AppSidebar({ onSelectPlaylist }: AppSidebarProps) {
         </div>
       </ScrollArea>
         
-      <div className="mt-auto p-2 group-data-[collapsible=icon]:hidden">
-        <UploadProgress />
-      </div>
-
       <Dialog open={isCreating} onOpenChange={setIsCreating}>
         <DialogContent>
           <DialogHeader>
