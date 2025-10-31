@@ -168,7 +168,7 @@ export default function CommunityPage() {
                         />
                         {imagePreview && (
                             <div className="relative w-32 h-32">
-                                <Image src={imagePreview} alt="Image preview" layout="fill" className="rounded-md object-cover"/>
+                                <Image src={imagePreview} alt="Image preview" fill className="rounded-md object-cover"/>
                                 <Button variant="destructive" size="icon" className="absolute top-1 right-1 h-6 w-6" onClick={removeImage}>
                                     <X className="h-4 w-4" />
                                 </Button>
@@ -210,3 +210,5 @@ export default function CommunityPage() {
     </SidebarProvider>
   );
 }
+
+    
