@@ -42,7 +42,7 @@ interface MusicPlayerContextType {
   duration: number;
   volume: number;
   activePlaylistId: string;
-  addSong: (file: File, userId: string) => string; // Returns taskId
+  addSong: (source: File | string, userId: string) => string; // Returns taskId
   playTrack: (trackIndex: number, playlistId?: string) => void;
   togglePlayPause: () => void;
   playNext: () => void;
@@ -181,63 +181,99 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
     );
   };
 
-  const getAudioDuration = (file: File): Promise<number> => {
+  const getAudioDuration = (source: File | string): Promise<number> => {
     return new Promise((resolve) => {
       const audio = document.createElement('audio');
-      audio.src = URL.createObjectURL(file);
+      audio.src = typeof source === 'string' ? source : URL.createObjectURL(source);
+      audio.crossOrigin = 'anonymous'; // Important for CORS
+      
+      const cleanup = () => {
+          if (typeof source !== 'string') {
+              URL.revokeObjectURL(audio.src);
+          }
+      };
+
       audio.onloadedmetadata = () => {
         resolve(audio.duration);
-        URL.revokeObjectURL(audio.src);
+        cleanup();
       };
       audio.onerror = () => {
+        console.warn("Could not read audio duration. It's likely a CORS issue with the provided URL.");
         resolve(0); // Default to 0 if duration can't be read
-        URL.revokeObjectURL(audio.src);
+        cleanup();
       };
     });
   };
-
-  const fileToDataUri = (file: File) => {
-    return new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
+  
+  const sourceToDataUri = (source: File | string) => {
+    return new Promise<string>(async (resolve, reject) => {
+      if (typeof source === 'string') {
+        try {
+          // This is a simplified fetch; a robust solution might need a server-side proxy
+          // to bypass CORS for fetching the audio data to be sent to the AI.
+          // For now, we will assume the URL is CORS-friendly or that the AI can handle URLs.
+          // Let's pass the URL directly if possible, or handle the limitation.
+          // For this implementation, we'll tell the AI to classify based on the URL,
+          // but the Genkit flow expects a data URI. This is a limitation.
+          // We will attempt a fetch, but it may fail due to CORS.
+           const response = await fetch(source);
+           const blob = await response.blob();
+           const reader = new FileReader();
+           reader.onload = () => resolve(reader.result as string);
+           reader.onerror = reject;
+           reader.readAsDataURL(blob);
+        } catch (error) {
+          console.error("Failed to fetch from URL for AI classification due to CORS or other network issue.", error);
+          reject(error);
+        }
+      } else {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(source);
+      }
     });
   };
 
-  const addSong = (file: File, userId: string): string => {
+  const addSong = (source: File | string, userId: string): string => {
     if (!userId || !firestore) return '';
 
     const taskId = uuidv4();
     const songId = uuidv4();
+    const isFile = source instanceof File;
+    const fileName = isFile ? source.name : source.split('/').pop() || 'Untitled';
+    
     const newTask: UploadTask = {
       id: taskId,
-      fileName: file.name,
+      fileName,
       progress: 0,
       status: 'uploading',
     };
     setUploadTasks((prev) => [newTask, ...prev]);
 
-    const handleUpload = async () => {
+    const handleUploadAndSave = async () => {
       try {
-        const formData = new FormData();
-        formData.append('file', file);
-        
-        // Indicate that the file is now being processed by the server
-        updateTaskProgress(taskId, { progress: 50, status: 'uploading' });
+        let downloadURL: string;
 
-        const result = await uploadMedia(formData, 'audio');
-        
-        if (!result.success || !result.url) {
-          throw new Error(result.error || 'Music upload failed on server');
+        if (isFile) {
+            const formData = new FormData();
+            formData.append('file', source as File);
+            updateTaskProgress(taskId, { progress: 50, status: 'uploading' });
+            const result = await uploadMedia(formData, 'audio');
+            if (!result.success || !result.url) {
+                throw new Error(result.error || 'Music upload failed on server');
+            }
+            downloadURL = result.url;
+        } else {
+            downloadURL = source as string;
         }
         
-        const downloadURL = result.url;
         updateTaskProgress(taskId, { progress: 100, status: 'processing' });
 
         const [genreResponse, duration] = await Promise.all([
-          classifyMusicGenre({ musicDataUri: await fileToDataUri(file) }),
-          getAudioDuration(file),
+          // The sourceToDataUri might fail for CORS-protected URLs
+          sourceToDataUri(source).then(dataUri => classifyMusicGenre({ musicDataUri: dataUri })).catch(() => ({ genre: 'Unknown' })),
+          getAudioDuration(source),
         ]);
   
         const randomAlbumArt =
@@ -247,7 +283,7 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
         const newSong: Song = {
           id: songId,
           userId: userId,
-          title: file.name.replace(/\.[^/.]+$/, ''),
+          title: fileName.replace(/\.[^/.]+$/, ''),
           artist: 'Unknown Artist',
           fileUrl: downloadURL,
           duration: duration,
@@ -272,7 +308,7 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
       }
     };
 
-    handleUpload();
+    handleUploadAndSave();
     
     return taskId;
   };
@@ -380,4 +416,3 @@ export const useMusicPlayer = () => {
   }
   return context;
 };
- 

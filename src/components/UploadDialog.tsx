@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -13,9 +14,10 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useMusicPlayer } from '@/contexts/MusicPlayerContext';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Upload } from 'lucide-react';
+import { Loader2, Upload, Link } from 'lucide-react';
 import { useUser } from '@/firebase';
 import { Progress } from './ui/progress';
 import type { UploadTask } from '@/lib/types';
@@ -25,8 +27,10 @@ export function UploadDialog() {
   const { user } = useUser();
   const { toast } = useToast();
   const [file, setFile] = useState<File | null>(null);
+  const [url, setUrl] = useState('');
   const [open, setOpen] = useState(false);
   const [currentTaskId, setCurrentTaskId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState('file');
 
   const currentTask = uploadTasks.find(task => task.id === currentTaskId);
 
@@ -56,14 +60,6 @@ export function UploadDialog() {
   };
 
   const handleSubmit = async () => {
-    if (!file) {
-        toast({
-            variant: "destructive",
-            title: "Upload Error",
-            description: "Please choose a music file to upload.",
-        });
-        return;
-    }
     if (!user) {
         toast({
             variant: "destructive",
@@ -72,19 +68,35 @@ export function UploadDialog() {
         });
         return;
     }
+
+    let taskId;
+    if (activeTab === 'file' && file) {
+        taskId = addSong(file, user.uid);
+    } else if (activeTab === 'url' && url) {
+        // Here you would call a new function in your context, e.g., addSongFromUrl
+        // For now, let's assume addSong can handle a URL string
+        taskId = addSong(url, user.uid);
+    } else {
+        toast({
+            variant: "destructive",
+            title: "Upload Error",
+            description: activeTab === 'file' ? "Please choose a music file to upload." : "Please enter a valid URL.",
+        });
+        return;
+    }
     
-    // addSong returns the taskId
-    const taskId = addSong(file, user.uid);
     setCurrentTaskId(taskId);
   };
 
   const resetAndClose = () => {
     setFile(null);
+    setUrl('');
     setCurrentTaskId(null);
     setOpen(false);
   };
 
   const isUploading = currentTask && (currentTask.status === 'uploading' || currentTask.status === 'processing');
+  const canSubmit = (activeTab === 'file' && !!file) || (activeTab === 'url' && !!url);
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => {
@@ -92,6 +104,7 @@ export function UploadDialog() {
             setOpen(isOpen);
             if (!isOpen) {
                 setFile(null);
+                setUrl('');
                 setCurrentTaskId(null);
             }
         }
@@ -110,17 +123,37 @@ export function UploadDialog() {
         <DialogHeader>
           <DialogTitle>Upload Your Music</DialogTitle>
           <DialogDescription>
-            Choose an audio file from your device. We'll automatically classify its genre for you.
+            Choose an audio file from your device or provide a direct URL. We'll classify its genre for you.
           </DialogDescription>
         </DialogHeader>
-        
-        {!isUploading && (
-            <div className="grid w-full max-w-sm items-center gap-1.5">
-                <Label htmlFor="music-file">Music File</Label>
-                <Input id="music-file" type="file" accept="audio/*" onChange={handleFileChange} />
-            </div>
-        )}
 
+        {!isUploading ? (
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="file">
+                        <Upload className="mr-2 h-4 w-4"/>
+                        Upload File
+                    </TabsTrigger>
+                    <TabsTrigger value="url">
+                        <Link className="mr-2 h-4 w-4"/>
+                        From URL
+                    </TabsTrigger>
+                </TabsList>
+                <TabsContent value="file" className="pt-4">
+                     <div className="grid w-full max-w-sm items-center gap-1.5">
+                        <Label htmlFor="music-file">Music File</Label>
+                        <Input id="music-file" type="file" accept="audio/*" onChange={handleFileChange} />
+                    </div>
+                </TabsContent>
+                <TabsContent value="url" className="pt-4">
+                    <div className="grid w-full items-center gap-1.5">
+                        <Label htmlFor="music-url">Audio URL</Label>
+                        <Input id="music-url" type="url" placeholder="https://example.com/song.mp3" value={url} onChange={(e) => setUrl(e.target.value)} />
+                    </div>
+                </TabsContent>
+            </Tabs>
+        ) : null}
+        
         {currentTask && (
           <div className="space-y-2 mt-4">
               <div className="flex items-center justify-between text-sm">
@@ -137,7 +170,7 @@ export function UploadDialog() {
           <Button variant="outline" onClick={resetAndClose} disabled={isUploading}>
             Cancel
           </Button>
-          <Button onClick={handleSubmit} disabled={!file || isUploading}>
+          <Button onClick={handleSubmit} disabled={!canSubmit || isUploading}>
             {isUploading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {currentTask?.status === 'processing' ? 'Processing...' : isUploading ? 'Uploading...' : 'Upload & Classify'}
           </Button>
