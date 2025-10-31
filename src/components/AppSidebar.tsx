@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useMusicPlayer } from '@/contexts/MusicPlayerContext';
@@ -18,12 +19,14 @@ import { useSidebar } from './ui/sidebar';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
+import { useUser } from '@/firebase';
 
 interface AppSidebarProps {
   onSelectPlaylist: (playlistId: string) => void;
 }
 
 export function AppSidebar({ onSelectPlaylist }: AppSidebarProps) {
+  const { user } = useUser();
   const { playlists, createPlaylist, activePlaylistId } = useMusicPlayer();
   const [isCreating, setIsCreating] = useState(false);
   const [newPlaylistName, setNewPlaylistName] = useState('');
@@ -89,43 +92,47 @@ export function AppSidebar({ onSelectPlaylist }: AppSidebarProps) {
                 <span className="group-data-[collapsible=icon]:hidden">My Library</span>
             </Button>
           </div>
+          
+          {user && (
+            <>
+              <div className="flex items-center justify-between mb-2 px-3">
+                <h2 className="text-sm font-semibold text-muted-foreground tracking-wider uppercase group-data-[collapsible=icon]:hidden">
+                  Playlists
+                </h2>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={() => setIsCreating(true)}
+                >
+                  <Plus className="w-4 h-4" />
+                  <span className="sr-only">New Playlist</span>
+                </Button>
+              </div>
 
-          <div className="flex items-center justify-between mb-2 px-3">
-            <h2 className="text-sm font-semibold text-muted-foreground tracking-wider uppercase group-data-[collapsible=icon]:hidden">
-              Playlists
-            </h2>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7"
-              onClick={() => setIsCreating(true)}
-            >
-              <Plus className="w-4 h-4" />
-              <span className="sr-only">New Playlist</span>
-            </Button>
-          </div>
-
-          <ScrollArea className="flex-1 -mx-2">
-            <div className="px-2">
-              {playlists
-                .filter((p) => p.id !== 'library')
-                .map((playlist) => (
-                  <Button
-                    key={playlist.id}
-                    variant={
-                      activePlaylistId === playlist.id ? 'secondary' : 'ghost'
-                    }
-                    className="w-full justify-start gap-3 px-3 truncate"
-                    onClick={() => handleSelect(playlist.id)}
-                  >
-                    <ListMusic className="w-5 h-5 text-muted-foreground" />
-                    <span className="truncate group-data-[collapsible=icon]:hidden">
-                      {playlist.name}
-                    </span>
-                  </Button>
-                ))}
-            </div>
-          </ScrollArea>
+              <ScrollArea className="flex-1 -mx-2">
+                <div className="px-2">
+                  {playlists
+                    .filter((p) => p.id !== 'library')
+                    .map((playlist) => (
+                      <Button
+                        key={playlist.id}
+                        variant={
+                          activePlaylistId === playlist.id ? 'secondary' : 'ghost'
+                        }
+                        className="w-full justify-start gap-3 px-3 truncate"
+                        onClick={() => handleSelect(playlist.id)}
+                      >
+                        <ListMusic className="w-5 h-5 text-muted-foreground" />
+                        <span className="truncate group-data-[collapsible=icon]:hidden">
+                          {playlist.name}
+                        </span>
+                      </Button>
+                    ))}
+                </div>
+              </ScrollArea>
+            </>
+          )}
         </>
       )}
 
@@ -153,5 +160,3 @@ export function AppSidebar({ onSelectPlaylist }: AppSidebarProps) {
     </div>
   );
 }
-
-    

@@ -22,11 +22,13 @@ import {
 } from '@/firebase';
 import {
   collection,
+  collectionGroup,
   doc,
   setDoc,
   updateDoc,
   arrayUnion,
   serverTimestamp,
+  query,
 } from 'firebase/firestore';
 import { v4 as uuidv4 } from 'uuid';
 import { classifyMusicGenre } from '@/ai/flows/ai-classify-uploaded-music';
@@ -74,11 +76,11 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
   const firestore = useFirestore();
   const { toast } = useToast();
 
-  const songsRef = useMemoFirebase(
-    () => (user ? collection(firestore, 'users', user.uid, 'songs') : null),
-    [firestore, user]
+  const allSongsQuery = useMemoFirebase(
+    () => (firestore ? query(collectionGroup(firestore, 'songs')) : null),
+    [firestore]
   );
-  const { data: songsData } = useCollection<Song>(songsRef);
+  const { data: songsData } = useCollection<Song>(allSongsQuery);
 
   const playlistsRef = useMemoFirebase(
     () => (user ? collection(firestore, 'users', user.uid, 'playlists') : null),
@@ -107,13 +109,20 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
       songIds: songs.map((s) => s.id),
       createdAt: serverTimestamp()
     };
-    return [libraryPlaylist, ...userPlaylists];
-  }, [playlistsData, songs]);
+    // If user is logged in, show their playlists, otherwise just show the library
+    return user ? [libraryPlaylist, ...userPlaylists] : [libraryPlaylist];
+  }, [playlistsData, songs, user]);
 
   const getPlaylistSongs = useCallback(
     (playlistId: string): Song[] => {
       const playlist = playlists.find((p) => p.id === playlistId);
       if (!playlist) return [];
+      
+      // For 'library' playlist, just return all songs
+      if (playlistId === 'library') {
+          return songs;
+      }
+      
       return playlist.songIds
         .map((songId) => songs.find((s) => s.id === songId))
         .filter(Boolean) as Song[];
@@ -373,7 +382,14 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
       newPlaylistId
     );
     const newPlaylist: Playlist = { id: newPlaylistId, name, songIds: [], createdAt: serverTimestamp() };
-    await setDoc(playlistRef, newPlaylist);
+    setDoc(playlistRef, newPlaylist).catch(serverError => {
+        const permissionError = new FirestorePermissionError({
+            path: playlistRef.path,
+            operation: 'create',
+            requestResourceData: newPlaylist,
+        });
+        errorEmitter.emit('permission-error', permissionError);
+    });
   };
 
   const addSongToPlaylist = async (songId: string, playlistId: string) => {
@@ -385,8 +401,15 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
       'playlists',
       playlistId
     );
-    await updateDoc(playlistRef, {
+    updateDoc(playlistRef, {
       songIds: arrayUnion(songId),
+    }).catch(serverError => {
+        const permissionError = new FirestorePermissionError({
+            path: playlistRef.path,
+            operation: 'update',
+            requestResourceData: { songIds: arrayUnion(songId) },
+        });
+        errorEmitter.emit('permission-error', permissionError);
     });
   };
 

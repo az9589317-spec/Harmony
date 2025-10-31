@@ -47,16 +47,15 @@ service cloud.firestore {
       allow delete: if false;
 
       /**
-       * @description Protects the /users/{userId}/songs collection, ensuring only the owner can manage their songs, but anyone can read them.
-       * @path /users/{userId}/songs/{songId}
-       * @allow (get, list) Anyone can read any song.
-       * @allow (create, update, delete) Only the owner can manage their songs.
-       * @principle Public read access for songs, but write access is restricted to the owner.
+       * @description Protects the /users/{userId}/songs subcollection.
+       * Users can only manage their own songs.
+       * All users can read any song via a collection group query.
        */
       match /songs/{songId} {
         function isExistingOwner() {
             return isOwner(userId) && resource != null;
         }
+        
         allow get: if true;
         allow list: if true;
         allow create: if isSignedIn() && isOwner(userId) && request.resource.data.userId == userId;
@@ -81,6 +80,13 @@ service cloud.firestore {
           allow update: if isSignedIn() && isExistingOwner() && request.resource.data.userId == resource.data.userId;
           allow delete: if isSignedIn() && isExistingOwner();
       }
+    }
+    
+    /**
+     * @description Public read access for all songs via collection group query.
+     */
+    match /{path=**}/songs/{songId} {
+        allow get, list: if true;
     }
 
 
