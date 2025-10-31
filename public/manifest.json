@@ -4,8 +4,8 @@
   "description": "Upload, classify, and listen to your music.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#1a1a2e",
-  "theme_color": "#c850c0",
+  "background_color": "#2a1a3d",
+  "theme_color": "#6d28d9",
   "icons": [
     {
       "src": "/icons/icon-192x192.png",
