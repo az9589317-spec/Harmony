@@ -144,7 +144,7 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
     const nextIndex =
       (currentTrackIndexInPlaylist + 1) % activePlaylistSongs.length;
     playTrack(nextIndex, activePlaylistId);
-  }, [currentTrackIndexInPlaylist, activePlaylistSongs.length, activePlaylistId]);
+  }, [currentTrackIndexInPlaylist, activePlaylistSongs, activePlaylistId]);
 
 
   const updateTaskProgress = (
@@ -172,6 +172,15 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
       };
     });
   };
+  
+  const fileToDataUri = (file: File) => {
+    return new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
 
   const addSong = async (file: File) => {
     if (!user) return;
@@ -186,23 +195,26 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
     setUploadTasks((prev) => [newTask, ...prev]);
 
     try {
-      // 1. Get Authentication Parameters from a backend
       // WARNING: This is an insecure, temporary solution for demonstration.
       // In a real app, you must create your own secure backend endpoint that uses your private key.
       const getAuthenticationParameters = async () => {
-        const response = await fetch(
-          'https://imagekit-auth-server-fly.dev/api/imagekit/auth'
-        );
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`Failed to fetch auth params: ${errorText}`);
+        try {
+            const response = await fetch(
+              'https://imagekit-auth-server-fly.dev/api/imagekit/auth'
+            );
+            if (!response.ok) {
+              const errorText = await response.text();
+              throw new Error(`Failed to fetch auth params: ${errorText} (status: ${response.status})`);
+            }
+            return response.json();
+        } catch (error) {
+            console.error("Error fetching authentication parameters:", error);
+            throw error;
         }
-        return response.json();
       };
 
       const authParams = await getAuthenticationParameters();
-
-      // 2. Upload to ImageKit
+      
       const uploadResponse = await imagekit.upload({
         file: file,
         fileName: file.name,
@@ -218,7 +230,6 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
       
       const downloadURL = uploadResponse.url;
 
-      // 3. Classify Genre and Get Duration
       const [genreResponse, duration] = await Promise.all([
         classifyMusicGenre({ musicDataUri: await fileToDataUri(file) }),
         getAudioDuration(file),
@@ -228,7 +239,6 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
         PlaceHolderImages[Math.floor(Math.random() * PlaceHolderImages.length)]
           .imageUrl;
 
-      // 4. Save Song to Firestore
       const newSong: Song = {
         id: uploadResponse.fileId,
         userId: user.uid,
@@ -245,7 +255,6 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
 
       updateTaskProgress(taskId, { status: 'success' });
       
-      // 5. Remove from progress list after a delay
       setTimeout(() => {
         setUploadTasks((prev) => prev.filter((t) => t.id !== taskId));
       }, 5000);
@@ -254,19 +263,11 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
       console.error('Upload failed:', error);
       updateTaskProgress(taskId, {
         status: 'error',
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: error instanceof Error ? error.message : 'Unknown error during upload.',
       });
     }
   };
 
-  const fileToDataUri = (file: File) => {
-    return new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-  };
 
   const playTrack = (
     trackIndexInPlaylist: number,
@@ -281,7 +282,7 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
     if (track && audioRef.current) {
       if (track.url) {
         audioRef.current.src = track.url;
-        audioRef.current.crossOrigin = 'anonymous'; // Important for hosted content
+        audioRef.current.crossOrigin = 'anonymous';
       }
       setCurrentTrackIndexInPlaylist(trackIndexInPlaylist);
       audioRef.current
@@ -394,5 +395,3 @@ export const useMusicPlayer = () => {
   }
   return context;
 };
-
-    

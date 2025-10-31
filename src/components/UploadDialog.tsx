@@ -41,8 +41,6 @@ export function UploadDialog() {
         return;
     }
     
-    // The addSong function now handles the upload in the background.
-    // We can close the dialog immediately.
     addSong(file);
 
     toast({
