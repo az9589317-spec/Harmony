@@ -19,12 +19,6 @@ import {
   useFirebaseApp,
 } from '@/firebase';
 import {
-  getStorage,
-  ref,
-  uploadBytesResumable,
-  getDownloadURL,
-} from 'firebase/storage';
-import {
   collection,
   doc,
   setDoc,
@@ -33,6 +27,8 @@ import {
 } from 'firebase/firestore';
 import { v4 as uuidv4 } from 'uuid';
 import { classifyMusicGenre } from '@/ai/flows/ai-classify-uploaded-music';
+import { uploadMusic } from '@/app/actions/upload';
+
 
 interface MusicPlayerContextType {
   songs: Song[];
@@ -68,7 +64,6 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
 }) => {
   const { user } = useUser();
   const firestore = useFirestore();
-  const firebaseApp = useFirebaseApp();
 
   const songsRef = useMemoFirebase(
     () => (user ? collection(firestore, 'users', user.uid, 'songs') : null),
@@ -209,7 +204,7 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   const addSong = (file: File, userId: string): string => {
-    if (!userId || !firebaseApp) return '';
+    if (!userId || !firestore) return '';
 
     const taskId = uuidv4();
     const songId = uuidv4();
@@ -221,65 +216,61 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
     };
     setUploadTasks((prev) => [newTask, ...prev]);
 
-    try {
-      const storage = getStorage(firebaseApp);
-      const storageRef = ref(storage, `users/${userId}/songs/${songId}_${file.name}`);
-      const uploadTask = uploadBytesResumable(storageRef, file);
+    const handleUpload = async () => {
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        // This will simulate some progress before the server action is complete
+        updateTaskProgress(taskId, { progress: 50 });
 
-      uploadTask.on(
-        'state_changed',
-        (snapshot) => {
-          const progress =
-            (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-          updateTaskProgress(taskId, { progress });
-        },
-        (error) => {
-          console.error('Upload failed:', error);
-          updateTaskProgress(taskId, {
-            status: 'error',
-            error: error.message,
-          });
-        },
-        async () => {
-          updateTaskProgress(taskId, { progress: 100, status: 'processing' });
-          const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-
-          const [genreResponse, duration] = await Promise.all([
-            classifyMusicGenre({ musicDataUri: await fileToDataUri(file) }),
-            getAudioDuration(file),
-          ]);
-    
-          const randomAlbumArt =
-            PlaceHolderImages[Math.floor(Math.random() * PlaceHolderImages.length)]
-              .imageUrl;
-    
-          const newSong: Song = {
-            id: songId,
-            userId: userId,
-            title: file.name.replace(/\.[^/.]+$/, ''),
-            artist: 'Unknown Artist',
-            fileUrl: downloadURL,
-            duration: duration,
-            genre: genreResponse.genre || 'Unknown',
-            albumArtUrl: randomAlbumArt,
-          };
-    
-          const songRef = doc(firestore, 'users', userId, 'songs', newSong.id);
-          await setDoc(songRef, newSong);
-    
-          updateTaskProgress(taskId, { status: 'success' });
+        const result = await uploadMusic(formData);
+        
+        if (!result.success || !result.url) {
+          throw new Error(result.error || 'Music upload failed on server');
         }
-      );
-    } catch (error) {
-      console.error('Upload failed:', error);
-      updateTaskProgress(taskId, {
-        status: 'error',
-        error:
-          error instanceof Error
-            ? error.message
-            : 'Unknown error during upload.',
-      });
-    }
+
+        updateTaskProgress(taskId, { progress: 100, status: 'processing' });
+        const downloadURL = result.url;
+
+        const [genreResponse, duration] = await Promise.all([
+          classifyMusicGenre({ musicDataUri: await fileToDataUri(file) }),
+          getAudioDuration(file),
+        ]);
+  
+        const randomAlbumArt =
+          PlaceHolderImages[Math.floor(Math.random() * PlaceHolderImages.length)]
+            .imageUrl;
+  
+        const newSong: Song = {
+          id: songId,
+          userId: userId,
+          title: file.name.replace(/\.[^/.]+$/, ''),
+          artist: 'Unknown Artist',
+          fileUrl: downloadURL,
+          duration: duration,
+          genre: genreResponse.genre || 'Unknown',
+          albumArtUrl: randomAlbumArt,
+        };
+  
+        const songRef = doc(firestore, 'users', userId, 'songs', newSong.id);
+        await setDoc(songRef, newSong);
+  
+        updateTaskProgress(taskId, { status: 'success' });
+      } catch (error) {
+        console.error('Upload failed:', error);
+        updateTaskProgress(taskId, {
+          status: 'error',
+          error:
+            error instanceof Error
+              ? error.message
+              : 'Unknown error during upload.',
+        });
+      }
+    };
+
+    handleUpload();
+    
     return taskId;
   };
 

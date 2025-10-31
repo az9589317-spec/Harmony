@@ -27,7 +27,7 @@ export async function uploadImage(formData: FormData) {
         const result = await imagekit.upload({
             file: buffer,
             fileName: file.name,
-            folder: "/posts" // Example folder
+            folder: "/posts"
         });
         
         return {
@@ -37,6 +37,45 @@ export async function uploadImage(formData: FormData) {
         };
     } catch (error: any) {
         console.error('Upload function error:', error);
+        return {
+            success: false,
+            error: error.message
+        };
+    }
+}
+
+export async function uploadMusic(formData: FormData) {
+    try {
+        const file = formData.get('file') as File;
+
+        if (!file) {
+            throw new Error('No file provided');
+        }
+
+        // 100MB limit check
+        if (file.size > 100 * 1024 * 1024) {
+            throw new Error('File too large. Max 100MB');
+        }
+        
+        const bytes = await file.arrayBuffer();
+        const buffer = Buffer.from(bytes);
+        
+        const result = await imagekit.upload({
+            file: buffer,
+            fileName: file.name,
+            folder: "/music", // Separate folder for music
+            useUniqueFileName: true,
+            tags: ["audio", "music"]
+        });
+        
+        return {
+            success: true,
+            url: result.url,
+            fileId: result.fileId,
+            name: result.name
+        };
+    } catch (error: any) {
+        console.error('Music upload function error:', error);
         return {
             success: false,
             error: error.message
