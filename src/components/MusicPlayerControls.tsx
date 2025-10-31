@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useMusicPlayer } from '@/contexts/MusicPlayerContext';
@@ -25,6 +26,7 @@ export function MusicPlayerControls() {
     seek,
     volume,
     setVolume,
+    togglePlayerSheet,
   } = useMusicPlayer();
 
   const handleSeek = (value: number[]) => {
@@ -37,7 +39,10 @@ export function MusicPlayerControls() {
 
   return (
     <footer className="h-24 bg-card border-t shrink-0 p-2 sm:p-4 flex items-center gap-2 sm:gap-6 z-10 shadow-inner">
-      <div className="flex items-center gap-2 sm:gap-4 w-32 sm:w-64">
+      <div 
+        className="flex items-center gap-2 sm:gap-4 w-32 sm:w-64 cursor-pointer"
+        onClick={togglePlayerSheet}
+      >
         {currentTrack ? (
           <>
             <AlbumArt src={currentTrack.albumArtUrl} alt={currentTrack.title} className="w-10 h-10 sm:w-14 sm:h-14" />
@@ -65,7 +70,7 @@ export function MusicPlayerControls() {
             <SkipBack className="h-5 w-5" />
           </Button>
           <Button variant="default" size="icon" className="w-10 h-10 sm:w-12 sm:h-12 rounded-full" onClick={togglePlayPause} disabled={!currentTrack}>
-            {isPlaying ? <Pause className="h-5 w-5 sm:h-6 sm:w-6" fill="currentColor"/> : <Play className="h-5 w-5 sm:h-6 sm-w-6" fill="currentColor"/>}
+            {isPlaying ? <Pause className="h-5 w-5 sm:h-6 sm:w-6" fill="currentColor"/> : <Play className="h-5 w-5 sm:h-6 sm:w-6" fill="currentColor"/>}
           </Button>
           <Button variant="ghost" size="icon" onClick={playNext} disabled={!currentTrack}>
             <SkipForward className="h-5 w-5" />

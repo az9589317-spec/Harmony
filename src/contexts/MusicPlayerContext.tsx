@@ -43,6 +43,8 @@ interface MusicPlayerContextType {
   duration: number;
   volume: number;
   activePlaylistId: string;
+  isPlayerSheetOpen: boolean;
+  togglePlayerSheet: () => void;
   addSong: (source: File | string, userId: string) => string; // Returns taskId
   clearCompletedTasks: () => void;
   playTrack: (trackIndex: number, playlistId?: string) => void;
@@ -90,6 +92,7 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
   const [volume, setVolumeState] = useState(0.8);
   const audioRef = useRef<HTMLAudioElement>(null);
   const [uploadTasks, setUploadTasks] = useState<UploadTask[]>([]);
+  const [isPlayerSheetOpen, setIsPlayerSheetOpen] = useState(false);
 
   const songs = useMemo(() => songsData || [], [songsData]);
 
@@ -384,6 +387,10 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
     });
   };
 
+  const togglePlayerSheet = () => {
+    setIsPlayerSheetOpen(prev => !prev);
+  }
+
   return (
     <MusicPlayerContext.Provider
       value={{
@@ -397,6 +404,8 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
         duration,
         volume,
         activePlaylistId,
+        isPlayerSheetOpen,
+        togglePlayerSheet,
         addSong,
         clearCompletedTasks,
         playTrack,

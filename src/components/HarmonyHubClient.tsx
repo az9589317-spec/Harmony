@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useMemo } from 'react';
@@ -8,6 +9,7 @@ import { SongList } from '@/components/SongList';
 import { MusicPlayerControls } from '@/components/MusicPlayerControls';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { SidebarProvider, Sidebar, SidebarInset } from './ui/sidebar';
+import { ExpandedPlayerSheet } from './ExpandedPlayerSheet';
 
 export function HarmonyHubClient() {
   const { songs, playlists, getPlaylistSongs, activePlaylistId, setActivePlaylistId } = useMusicPlayer();
@@ -65,6 +67,7 @@ export function HarmonyHubClient() {
         </div>
         <MusicPlayerControls />
       </div>
+      <ExpandedPlayerSheet />
     </SidebarProvider>
   );
 }
