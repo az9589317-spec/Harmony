@@ -7,6 +7,7 @@ import { MusicPlayerProvider } from '@/contexts/MusicPlayerContext';
 export const metadata: Metadata = {
   title: 'Harmony Hub',
   description: 'Upload, classify, and listen to your music.',
+  manifest: '/manifest.json',
 };
 
 export default function RootLayout({
@@ -35,5 +36,3 @@ export default function RootLayout({
     </html>
   );
 }
-
-    
