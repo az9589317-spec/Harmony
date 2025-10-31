@@ -1,3 +1,4 @@
+
 'use server'
 
 import ImageKit from 'imagekit';
@@ -5,16 +6,16 @@ import { Buffer } from 'buffer';
 
 export async function uploadMedia(formData: FormData, mediaType: 'image' | 'audio') {
     try {
+        // Initialize ImageKit inside the action to access environment variables at runtime
+        const imagekit = new ImageKit({
+            publicKey: process.env.IMAGEKIT_PUBLIC_KEY!,
+            privateKey: process.env.IMAGEKIT_PRIVATE_KEY!,
+            urlEndpoint: process.env.IMAGEKIT_URL_ENDPOINT!
+        });
+
         console.log('=== SERVER ACTION START ===');
         console.log('Media type:', mediaType);
         
-        // Initialize ImageKit inside the action to access environment variables at runtime
-        const imagekit = new ImageKit({
-            publicKey: process.env.NEXT_PUBLIC_IMAGEKIT_PUBLIC_KEY!,
-            privateKey: process.env.IMAGEKIT_PRIVATE_KEY!,
-            urlEndpoint: process.env.NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT!
-        });
-
         const file = formData.get('file') as File;
         
         if (!file) {
