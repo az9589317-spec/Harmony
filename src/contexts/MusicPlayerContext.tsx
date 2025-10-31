@@ -29,6 +29,7 @@ import {
 import { v4 as uuidv4 } from 'uuid';
 import { classifyMusicGenre } from '@/ai/flows/ai-classify-uploaded-music';
 import { uploadMedia } from '@/app/actions/upload';
+import { useToast } from '@/hooks/use-toast';
 
 
 interface MusicPlayerContextType {
@@ -43,6 +44,7 @@ interface MusicPlayerContextType {
   volume: number;
   activePlaylistId: string;
   addSong: (source: File | string, userId: string) => string; // Returns taskId
+  clearCompletedTasks: () => void;
   playTrack: (trackIndex: number, playlistId?: string) => void;
   togglePlayPause: () => void;
   playNext: () => void;
@@ -65,6 +67,7 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
 }) => {
   const { user } = useUser();
   const firestore = useFirestore();
+  const { toast } = useToast();
 
   const songsRef = useMemoFirebase(
     () => (user ? collection(firestore, 'users', user.uid, 'songs') : null),
@@ -180,6 +183,10 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
       )
     );
   };
+  
+  const clearCompletedTasks = () => {
+    setUploadTasks([]);
+  }
 
   const getAudioDuration = (source: File | string): Promise<number> => {
     return new Promise((resolve) => {
@@ -209,13 +216,6 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
     return new Promise<string>(async (resolve, reject) => {
       if (typeof source === 'string') {
         try {
-          // This is a simplified fetch; a robust solution might need a server-side proxy
-          // to bypass CORS for fetching the audio data to be sent to the AI.
-          // For now, we will assume the URL is CORS-friendly or that the AI can handle URLs.
-          // Let's pass the URL directly if possible, or handle the limitation.
-          // For this implementation, we'll tell the AI to classify based on the URL,
-          // but the Genkit flow expects a data URI. This is a limitation.
-          // We will attempt a fetch, but it may fail due to CORS.
            const response = await fetch(source);
            const blob = await response.blob();
            const reader = new FileReader();
@@ -249,11 +249,12 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
       progress: 0,
       status: 'uploading',
     };
-    setUploadTasks((prev) => [newTask, ...prev]);
+    setUploadTasks((prev) => [...prev, newTask]);
 
     const handleUploadAndSave = async () => {
       try {
         let downloadURL: string;
+        let fileToProcess: File | string = source;
 
         if (isFile) {
             const formData = new FormData();
@@ -271,9 +272,8 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
         updateTaskProgress(taskId, { progress: 100, status: 'processing' });
 
         const [genreResponse, duration] = await Promise.all([
-          // The sourceToDataUri might fail for CORS-protected URLs
-          sourceToDataUri(source).then(dataUri => classifyMusicGenre({ musicDataUri: dataUri })).catch(() => ({ genre: 'Unknown' })),
-          getAudioDuration(source),
+          sourceToDataUri(fileToProcess).then(dataUri => classifyMusicGenre({ musicDataUri: dataUri })).catch(() => ({ genre: 'Unknown' })),
+          getAudioDuration(fileToProcess),
         ]);
   
         const randomAlbumArt =
@@ -296,14 +296,22 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
         await setDoc(songRef, newSong);
   
         updateTaskProgress(taskId, { status: 'success' });
+        toast({
+          title: "Upload Complete",
+          description: `"${newSong.title}" has been added.`,
+        });
+
       } catch (error) {
         console.error('Upload failed:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error during upload.';
         updateTaskProgress(taskId, {
           status: 'error',
-          error:
-            error instanceof Error
-              ? error.message
-              : 'Unknown error during upload.',
+          error: errorMessage,
+        });
+        toast({
+            variant: "destructive",
+            title: `Upload Error: ${fileName}`,
+            description: errorMessage,
         });
       }
     };
@@ -390,6 +398,7 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
         volume,
         activePlaylistId,
         addSong,
+        clearCompletedTasks,
         playTrack,
         togglePlayPause,
         playNext,
