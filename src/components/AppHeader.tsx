@@ -61,7 +61,7 @@ export function AppHeader({ playlistName, onSearchChange }: AppHeaderProps) {
           <span className="sr-only">Toggle Sidebar</span>
         </Button>
         
-        <h1 className="text-xl sm:text-2xl font-bold tracking-tight font-headline truncate max-w-[150px] sm:max-w-xs">
+        <h1 className="text-lg sm:text-xl font-bold tracking-tight font-headline truncate max-w-[150px] sm:max-w-xs">
           {playlistName}
         </h1>
       </div>
