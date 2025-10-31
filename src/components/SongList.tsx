@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { Song } from '@/lib/types';
@@ -24,6 +25,9 @@ import { AlbumArt } from './AlbumArt';
 import { Clock, MoreHorizontal, Music, Plus, Play, Pencil } from 'lucide-react';
 import { EditSongDialog } from './EditSongDialog';
 import { useUser } from '@/firebase';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { Card, CardContent } from './ui/card';
+import { Button } from './ui/button';
 
 interface SongListProps {
   songs: Song[];
@@ -37,10 +41,48 @@ function formatDuration(seconds: number) {
   return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
 }
 
+const SongItemMenu = ({ song, onEdit }: { song: Song, onEdit: (song: Song, e: React.MouseEvent) => void }) => {
+    const { user } = useUser();
+    const { playlists, addSongToPlaylist } = useMusicPlayer();
+    
+    return (
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
+                    <MoreHorizontal className="w-4 h-4"/>
+                    <span className="sr-only">More options</span>
+                </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                <DropdownMenuSub>
+                    <DropdownMenuSubTrigger>
+                        <Plus className="mr-2 h-4 w-4"/>
+                        Add to playlist
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent>
+                        {playlists.filter(p => p.id !== 'library').map(p => (
+                            <DropdownMenuItem key={p.id} onClick={() => addSongToPlaylist(song.id, p.id)}>
+                                {p.name}
+                            </DropdownMenuItem>
+                        ))}
+                    </DropdownMenuSubContent>
+                </DropdownMenuSub>
+                {user && user.uid === song.userId && (
+                  <DropdownMenuItem onClick={(e) => onEdit(song, e)}>
+                      <Pencil className="mr-2 h-4 w-4"/>
+                      Edit Song
+                  </DropdownMenuItem>
+                )}
+            </DropdownMenuContent>
+        </DropdownMenu>
+    );
+};
+
+
 export function SongList({ songs, playlistId }: SongListProps) {
-  const { playTrack, playlists, addSongToPlaylist, currentTrack } = useMusicPlayer();
-  const { user } = useUser();
+  const { playTrack, currentTrack } = useMusicPlayer();
   const [songToEdit, setSongToEdit] = useState<Song | null>(null);
+  const isMobile = useIsMobile();
 
   const handleEdit = (song: Song, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -56,83 +98,82 @@ export function SongList({ songs, playlistId }: SongListProps) {
         </div>
     )
   }
+
+  const renderMobileList = () => (
+    <div className="space-y-2 p-2">
+        {songs.map((song, index) => (
+             <Card 
+                key={song.id} 
+                onClick={() => playTrack(index, playlistId)}
+                data-state={currentTrack?.id === song.id ? 'selected' : undefined}
+                className="cursor-pointer transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted"
+            >
+                <CardContent className="flex items-center gap-4 p-2">
+                    <AlbumArt src={song.albumArtUrl} alt={song.title} className="w-12 h-12" />
+                    <div className="flex-1 overflow-hidden">
+                        <p className="font-medium truncate">{song.title}</p>
+                        <p className="text-sm text-muted-foreground truncate">{song.artist}</p>
+                    </div>
+                    <SongItemMenu song={song} onEdit={handleEdit} />
+                </CardContent>
+            </Card>
+        ))}
+    </div>
+  );
   
+  const renderDesktopTable = () => (
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="w-12 px-2 md:px-4"></TableHead>
+            <TableHead>Title</TableHead>
+            <TableHead className="hidden md:table-cell">Artist</TableHead>
+            <TableHead className="hidden lg:table-cell">Genre</TableHead>
+            <TableHead className="text-right w-24">
+              <Clock className="inline-block w-4 h-4" />
+            </TableHead>
+            <TableHead className="w-12"></TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {songs.map((song, index) => (
+            <TableRow 
+                key={song.id} 
+                className="group cursor-pointer"
+                data-state={currentTrack?.id === song.id ? 'selected' : undefined}
+                onClick={() => playTrack(index, playlistId)}
+            >
+              <TableCell className="px-2 md:px-4">
+                <div className="relative">
+                  <AlbumArt src={song.albumArtUrl} alt={song.title} className="w-10 h-10" />
+                  <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Play className="w-5 h-5 text-white" fill="white"/>
+                  </div>
+                </div>
+              </TableCell>
+              <TableCell className="font-medium">
+                <div>{song.title}</div>
+              </TableCell>
+              <TableCell className="text-muted-foreground hidden md:table-cell">{song.artist}</TableCell>
+              <TableCell className="text-muted-foreground capitalize hidden lg:table-cell">{song.genre}</TableCell>
+              <TableCell className="text-right text-muted-foreground">
+                {formatDuration(song.duration)}
+              </TableCell>
+              <TableCell onClick={(e) => e.stopPropagation()} className="px-0 md:px-4 w-10 md:w-12">
+                  <div className="opacity-0 group-hover:opacity-100 focus-within:opacity-100">
+                    <SongItemMenu song={song} onEdit={handleEdit} />
+                  </div>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+  );
+
   return (
     <>
-      <div className="p-2 md:p-6">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-12 px-2 md:px-4"></TableHead>
-              <TableHead>Title</TableHead>
-              <TableHead className="hidden md:table-cell">Artist</TableHead>
-              <TableHead className="hidden lg:table-cell">Genre</TableHead>
-              <TableHead className="text-right w-24">
-                <Clock className="inline-block w-4 h-4" />
-              </TableHead>
-              <TableHead className="w-12"></TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {songs.map((song, index) => (
-              <TableRow 
-                  key={song.id} 
-                  className="group cursor-pointer"
-                  data-state={currentTrack?.id === song.id ? 'selected' : undefined}
-                  onClick={() => playTrack(index, playlistId)}
-              >
-                <TableCell className="px-2 md:px-4">
-                  <div className="relative">
-                    <AlbumArt src={song.albumArtUrl} alt={song.title} className="w-10 h-10" />
-                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Play className="w-5 h-5 text-white" fill="white"/>
-                    </div>
-                  </div>
-                </TableCell>
-                <TableCell className="font-medium">
-                  <div>{song.title}</div>
-                  <div className="text-muted-foreground text-xs md:hidden">{song.artist}</div>
-                </TableCell>
-                <TableCell className="text-muted-foreground hidden md:table-cell">{song.artist}</TableCell>
-                <TableCell className="text-muted-foreground capitalize hidden lg:table-cell">{song.genre}</TableCell>
-                <TableCell className="text-right text-muted-foreground">
-                  {formatDuration(song.duration)}
-                </TableCell>
-                <TableCell onClick={(e) => e.stopPropagation()} className="px-0 md:px-4 w-10 md:w-12">
-                  <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                          <button className="p-2 opacity-0 group-hover:opacity-100 focus:opacity-100 rounded-full hover:bg-secondary">
-                              <MoreHorizontal className="w-4 h-4"/>
-                              <span className="sr-only">More options</span>
-                          </button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                          <DropdownMenuSub>
-                              <DropdownMenuSubTrigger>
-                                  <Plus className="mr-2 h-4 w-4"/>
-                                  Add to playlist
-                              </DropdownMenuSubTrigger>
-                              <DropdownMenuSubContent>
-                                  {playlists.filter(p => p.id !== 'library').map(p => (
-                                      <DropdownMenuItem key={p.id} onClick={() => addSongToPlaylist(song.id, p.id)}>
-                                          {p.name}
-                                      </DropdownMenuItem>
-                                  ))}
-                              </DropdownMenuSubContent>
-                          </DropdownMenuSub>
-                          {user && user.uid === song.userId && (
-                            <DropdownMenuItem onClick={(e) => handleEdit(song, e)}>
-                                <Pencil className="mr-2 h-4 w-4"/>
-                                Edit Song
-                            </DropdownMenuItem>
-                          )}
-                      </DropdownMenuContent>
-                  </DropdownMenu>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+      <div className="md:p-6">
+        {isMobile ? renderMobileList() : renderDesktopTable()}
       </div>
       {songToEdit && (
         <EditSongDialog
