@@ -67,7 +67,13 @@ export function ExpandedPlayerSheet() {
         side="bottom"
         className="h-screen w-screen max-w-full bg-gradient-to-b from-primary/80 to-background flex flex-col p-4 sm:p-8"
       >
-        {/* We don't use SheetHeader, Title, or Description to have full control over the layout */}
+        <SheetHeader className="sr-only">
+          <SheetTitle>Now Playing: {currentTrack.title}</SheetTitle>
+          <SheetDescription>
+            Music player controls and details for the current song.
+          </SheetDescription>
+        </SheetHeader>
+        
         <div className="flex-1 flex flex-col items-center justify-center gap-8 text-primary-foreground">
             <AlbumArt
                 src={currentTrack.albumArtUrl}
