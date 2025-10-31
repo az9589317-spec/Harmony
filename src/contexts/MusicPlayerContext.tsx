@@ -27,7 +27,7 @@ import {
 } from 'firebase/firestore';
 import { v4 as uuidv4 } from 'uuid';
 import { classifyMusicGenre } from '@/ai/flows/ai-classify-uploaded-music';
-import { uploadMusic } from '@/app/actions/upload';
+import { uploadMedia } from '@/app/actions/upload';
 
 
 interface MusicPlayerContextType {
@@ -224,7 +224,7 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
         // This will simulate some progress before the server action is complete
         updateTaskProgress(taskId, { progress: 50 });
 
-        const result = await uploadMusic(formData);
+        const result = await uploadMedia(formData, 'audio');
         
         if (!result.success || !result.url) {
           throw new Error(result.error || 'Music upload failed on server');

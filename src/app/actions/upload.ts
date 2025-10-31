@@ -13,12 +13,30 @@ const imagekit = new ImageKit({
     urlEndpoint: process.env.NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT
 });
 
-export async function uploadImage(formData: FormData) {
+
+export async function uploadMedia(formData: FormData, mediaType: 'image' | 'audio') {
     try {
         const file = formData.get('file') as File;
         
         if (!file) {
-            throw new Error('No file provided');
+            throw new Error('No file selected');
+        }
+        
+        let folder: string;
+        switch(mediaType) {
+            case 'image':
+                folder = '/posts';
+                break;
+            case 'audio':
+                folder = '/music';
+                break;
+            default:
+                folder = '/media';
+        }
+        
+        const maxSize = 100 * 1024 * 1024; // 100MB
+        if (file.size > maxSize) {
+            throw new Error(`File too large: ${(file.size/1024/1024).toFixed(2)}MB. Max 100MB`);
         }
         
         const bytes = await file.arrayBuffer();
@@ -27,46 +45,14 @@ export async function uploadImage(formData: FormData) {
         const result = await imagekit.upload({
             file: buffer,
             fileName: file.name,
-            folder: "/posts"
-        });
-        
-        return {
-            success: true,
-            url: result.url,
-            fileId: result.fileId
-        };
-    } catch (error: any) {
-        console.error('Upload function error:', error);
-        return {
-            success: false,
-            error: error.message
-        };
-    }
-}
-
-export async function uploadMusic(formData: FormData) {
-    try {
-        const file = formData.get('file') as File;
-
-        if (!file) {
-            throw new Error('No file provided');
-        }
-
-        // 100MB limit check
-        if (file.size > 100 * 1024 * 1024) {
-            throw new Error('File too large. Max 100MB');
-        }
-        
-        const bytes = await file.arrayBuffer();
-        const buffer = Buffer.from(bytes);
-        
-        const result = await imagekit.upload({
-            file: buffer,
-            fileName: file.name,
-            folder: "/music", // Separate folder for music
+            folder: folder,
             useUniqueFileName: true,
-            tags: ["audio", "music"]
+            tags: [mediaType]
         });
+        
+        if (!result || !result.url) {
+            throw new Error('ImageKit did not return a URL');
+        }
         
         return {
             success: true,
@@ -74,8 +60,9 @@ export async function uploadMusic(formData: FormData) {
             fileId: result.fileId,
             name: result.name
         };
+        
     } catch (error: any) {
-        console.error('Music upload function error:', error);
+        console.error('Upload function error:', error);
         return {
             success: false,
             error: error.message

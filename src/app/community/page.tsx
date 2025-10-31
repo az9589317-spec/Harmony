@@ -20,7 +20,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import Image from 'next/image';
 import { useCollection, useMemoFirebase } from '@/firebase';
 import { query, orderBy } from 'firebase/firestore';
-import { uploadImage } from '@/app/actions/upload';
+import { uploadMedia } from '@/app/actions/upload';
 
 
 function PostCard({ post }: { post: Post }) {
@@ -115,11 +115,10 @@ export default function CommunityPage() {
         let imageUrl: string | undefined = undefined;
 
         if (postImage) {
-            const formData = new FormData(formRef.current);
-            if (!formData.has('file') && postImage) {
-              formData.append('file', postImage);
-            }
-            const result = await uploadImage(formData);
+            const formData = new FormData();
+            formData.append('file', postImage);
+            
+            const result = await uploadMedia(formData, 'image');
             
             if (!result.success) {
                 throw new Error(result.error || 'Image upload failed');
@@ -143,6 +142,7 @@ export default function CommunityPage() {
             setPostContent('');
             removeImage();
             setIsSubmitting(false);
+            formRef.current?.reset();
           })
           .catch((serverError) => {
             const permissionError = new FirestorePermissionError({
