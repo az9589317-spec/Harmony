@@ -83,6 +83,7 @@ export function SongList({ songs, playlistId }: SongListProps) {
   const { playTrack, currentTrack } = useMusicPlayer();
   const [songToEdit, setSongToEdit] = useState<Song | null>(null);
   const isMobile = useIsMobile();
+  const [mobileLimit, setMobileLimit] = useState(15);
 
   const handleEdit = (song: Song, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -99,9 +100,13 @@ export function SongList({ songs, playlistId }: SongListProps) {
     )
   }
 
-  const renderMobileList = () => (
-    <div className="space-y-2 p-2 sm:p-4">
-        {songs.map((song, index) => (
+  const renderMobileList = () => {
+    const songsToShow = songs.slice(0, mobileLimit);
+    const hasMore = songs.length > mobileLimit;
+
+    return (
+      <div className="space-y-2 p-2 sm:p-4">
+        {songsToShow.map((song, index) => (
              <Card 
                 key={song.id} 
                 onClick={() => playTrack(index, playlistId)}
@@ -118,8 +123,16 @@ export function SongList({ songs, playlistId }: SongListProps) {
                 </CardContent>
             </Card>
         ))}
-    </div>
-  );
+        {hasMore && (
+          <div className="pt-4 text-center">
+            <Button variant="outline" onClick={() => setMobileLimit(prev => prev + 15)}>
+              Show More
+            </Button>
+          </div>
+        )}
+      </div>
+    );
+  };
   
   const renderDesktopTable = () => (
       <Table>
