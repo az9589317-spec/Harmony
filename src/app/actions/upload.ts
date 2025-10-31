@@ -49,10 +49,11 @@ export async function uploadMedia(formData: FormData, mediaType: 'image' | 'audi
         // Size check
         const maxSize = 100 * 1024 * 1024; // 100MB
         if (file.size > maxSize) {
-            console.error('File too large');
+            const fileSizeMB = (file.size / 1024 / 1024).toFixed(2);
+            console.error('File too large:', fileSizeMB + 'MB');
             return {
                 success: false,
-                error: `File exceeds 100MB limit. File size: ${(file.size/1024/1024).toFixed(2)}MB`
+                error: `File too large: ${fileSizeMB}MB. Max 100MB allowed.`
             };
         }
         
