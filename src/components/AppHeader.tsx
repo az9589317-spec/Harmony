@@ -61,27 +61,13 @@ export function AppHeader({ playlistName, onSearchChange }: AppHeaderProps) {
           <span className="sr-only">Toggle Sidebar</span>
         </Button>
         
-        {isMobile && isSearchVisible ? (
-           <div className="relative w-full">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-             <Input
-               placeholder="Search..."
-               className="pl-9 w-full bg-background"
-               onChange={(e) => onSearchChange(e.target.value)}
-               autoFocus
-               onBlur={() => setIsSearchVisible(false)}
-             />
-           </div>
-        ) : (
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight font-headline truncate max-w-[150px] sm:max-w-xs">
-            {playlistName}
-          </h1>
-        )}
+        <h1 className="text-xl sm:text-2xl font-bold tracking-tight font-headline truncate max-w-[150px] sm:max-w-xs">
+          {playlistName}
+        </h1>
       </div>
 
-      <div className="flex items-center gap-2 sm:gap-4">
-        {!isSearchVisible && (
-          <div className="hidden md:flex relative w-64">
+      <div className="flex flex-1 items-center justify-end gap-2 sm:gap-4">
+        <div className="relative w-full max-w-sm hidden md:block">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search songs, artists..."
@@ -89,6 +75,20 @@ export function AppHeader({ playlistName, onSearchChange }: AppHeaderProps) {
               onChange={(e) => onSearchChange(e.target.value)}
             />
           </div>
+
+        {isMobile && isSearchVisible && (
+           <div className="absolute top-16 left-0 right-0 p-2 bg-card border-b z-10">
+            <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                placeholder="Search..."
+                className="pl-9 w-full bg-background"
+                onChange={(e) => onSearchChange(e.target.value)}
+                autoFocus
+                onBlur={() => setIsSearchVisible(false)}
+                />
+            </div>
+           </div>
         )}
 
         <Button variant="ghost" size="icon" className="md:hidden" onClick={toggleSearch}>
