@@ -42,6 +42,10 @@ export function UploadDialog() {
             resolve(audio.duration);
             URL.revokeObjectURL(audio.src);
         };
+        audio.onerror = () => {
+            resolve(0); // Resolve with 0 if there's an error loading the audio
+            URL.revokeObjectURL(audio.src);
+        }
     });
   }
 
@@ -63,38 +67,57 @@ export function UploadDialog() {
       reader.onload = async () => {
         const musicDataUri = reader.result as string;
         
-        const [genreResponse, duration] = await Promise.all([
-          classifyMusicGenre({ musicDataUri }),
-          getAudioDuration(file)
-        ]);
+        try {
+            const [genreResponse, duration] = await Promise.all([
+                classifyMusicGenre({ musicDataUri }),
+                getAudioDuration(file)
+            ]);
 
-        const randomAlbumArt = PlaceHolderImages[Math.floor(Math.random() * PlaceHolderImages.length)].imageUrl;
+            const randomAlbumArt = PlaceHolderImages[Math.floor(Math.random() * PlaceHolderImages.length)].imageUrl;
 
-        const newSong = {
-          title: file.name.replace(/\.[^/.]+$/, ""),
-          artist: 'Unknown Artist',
-          url: URL.createObjectURL(file),
-          duration: duration,
-          genre: genreResponse.genre || 'Unknown',
-          albumArtUrl: randomAlbumArt,
-          userId: user.uid,
-        };
+            const newSong = {
+              title: file.name.replace(/\.[^/.]+$/, ""),
+              artist: 'Unknown Artist',
+              duration: duration,
+              genre: genreResponse.genre || 'Unknown',
+              albumArtUrl: randomAlbumArt,
+            };
 
-        await addSong(newSong as any);
-        toast({
-          title: "Song Uploaded!",
-          description: `"${newSong.title}" was added to your library.`,
-        });
-        setFile(null);
-        setIsLoading(false);
-        setOpen(false);
+            await addSong(newSong, file);
+
+            toast({
+              title: "Song Uploaded!",
+              description: `"${newSong.title}" was added to your library.`,
+            });
+
+            setFile(null);
+            setOpen(false);
+        } catch (error) {
+            console.error("Error during song processing:", error);
+            toast({
+                variant: 'destructive',
+                title: 'Processing Failed',
+                description: 'Could not classify or save the song.',
+            });
+        } finally {
+            setIsLoading(false);
+        }
       };
+      reader.onerror = (error) => {
+        console.error("FileReader error:", error);
+        toast({
+            variant: 'destructive',
+            title: 'File Read Error',
+            description: 'Could not read the selected file.',
+        });
+        setIsLoading(false);
+      }
     } catch (error) {
-      console.error(error);
+      console.error("Outer error handler:",error);
       toast({
         variant: 'destructive',
         title: 'Upload Failed',
-        description: 'Could not classify or add the song.',
+        description: 'An unexpected error occurred during upload.',
       });
       setIsLoading(false);
     }

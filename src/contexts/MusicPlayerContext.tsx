@@ -18,6 +18,7 @@ import {
   useMemoFirebase,
 } from '@/firebase';
 import { collection, doc, setDoc, deleteDoc, writeBatch } from 'firebase/firestore';
+import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 interface MusicPlayerContextType {
   songs: Song[];
@@ -29,7 +30,7 @@ interface MusicPlayerContextType {
   duration: number;
   volume: number;
   activePlaylistId: string;
-  addSong: (song: Omit<Song, 'id' | 'userId'> & { id?: string }) => void;
+  addSong: (song: Omit<Song, 'id' | 'userId' | 'url'>, file: File) => Promise<void>;
   playTrack: (trackIndex: number, playlistId?: string) => void;
   togglePlayPause: () => void;
   playNext: () => void;
@@ -52,6 +53,7 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
 }) => {
   const { user } = useUser();
   const firestore = useFirestore();
+  const storage = getStorage();
 
   const songsRef = useMemoFirebase(
     () => (user ? collection(firestore, 'users', user.uid, 'songs') : null),
@@ -123,15 +125,22 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
   }, [currentTrack]);
 
   const addSong = async (
-    song: Omit<Song, 'id' | 'userId' | 'url'> & { url: string; id?: string }
+    song: Omit<Song, 'id' | 'userId' | 'url'>, file: File
   ) => {
     if (!user) return;
-    const songId = song.id || doc(collection(firestore, 'temp')).id;
+    const songId = doc(collection(firestore, 'temp')).id;
+    
+    // Upload file to Firebase Storage
+    const storageRef = ref(storage, `users/${user.uid}/songs/${songId}_${file.name}`);
+    const uploadResult = await uploadBytes(storageRef, file);
+    const downloadURL = await getDownloadURL(uploadResult.ref);
+
     const songRef = doc(firestore, 'users', user.uid, 'songs', songId);
     const newSong: Song = {
       ...song,
       id: songId,
       userId: user.uid,
+      url: downloadURL,
       albumArtUrl:
         song.albumArtUrl ||
         PlaceHolderImages[Math.floor(Math.random() * PlaceHolderImages.length)]
@@ -151,7 +160,10 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
     const track = targetPlaylistSongs[trackIndexInPlaylist];
 
     if (track && audioRef.current) {
-      if (track.url) audioRef.current.src = track.url;
+      if (track.url) {
+        audioRef.current.src = track.url;
+        audioRef.current.crossOrigin = "anonymous";
+      }
       setCurrentTrackIndexInPlaylist(trackIndexInPlaylist);
       audioRef.current
         .play()
@@ -177,7 +189,7 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
     if (currentTrackIndexInPlaylist === null) return;
     const nextIndex = (currentTrackIndexInPlaylist + 1) % activePlaylistSongs.length;
     playTrack(nextIndex, activePlaylistId);
-  }, [currentTrackIndexInPlaylist, activePlaylistSongs.length, activePlaylistId]);
+  }, [currentTrackIndexInPlaylist, activePlaylistSongs.length, activePlaylistId, playTrack]);
 
   const playPrevious = () => {
     if (currentTrackIndexInPlaylist === null) return;
@@ -240,7 +252,7 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
         duration,
         volume,
         activePlaylistId,
-        addSong: addSong as any, //TODO: Fix type
+        addSong,
         playTrack,
         togglePlayPause,
         playNext,
