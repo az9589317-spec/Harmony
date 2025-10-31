@@ -2,7 +2,7 @@ export interface Song {
   id: string;
   title: string;
   artist: string;
-  url: string;
+  fileUrl: string;
   duration: number;
   genre: string;
   albumArtUrl: string;
@@ -22,5 +22,3 @@ export interface UploadTask {
   status: 'uploading' | 'processing' | 'success' | 'error';
   error?: string;
 }
-
-    
