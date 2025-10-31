@@ -1,10 +1,10 @@
 'use client';
 
-import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { useUser, useFirestore } from '@/firebase';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState, useRef, useMemo } from 'react';
-import { collection, addDoc, serverTimestamp, query, orderBy } from 'firebase/firestore';
-import { Loader2, Send, Paperclip, X } from 'lucide-react';
+import { useEffect, useState, useRef } from 'react';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { Loader2, Paperclip, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -18,7 +18,10 @@ import { AppSidebar } from '@/components/AppSidebar';
 import { SidebarProvider, Sidebar, SidebarInset } from '@/components/ui/sidebar';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import Image from 'next/image';
-import ImageKit from 'imagekit-javascript';
+import { useCollection, useMemoFirebase } from '@/firebase';
+import { query, orderBy } from 'firebase/firestore';
+import { uploadImage } from '@/app/actions/upload';
+
 
 function PostCard({ post }: { post: Post }) {
     const getInitials = (name?: string | null) => {
@@ -64,15 +67,8 @@ export default function CommunityPage() {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
 
-  const imagekit = useMemo(() => {
-    if (typeof window === 'undefined') return null;
-    return new ImageKit({
-        publicKey: process.env.NEXT_PUBLIC_IMAGEKIT_PUBLIC_KEY!,
-        urlEndpoint: process.env.NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT!,
-        authenticationEndpoint: "/api/imagekit/auth"
-    });
-  }, []);
 
   const postsQuery = useMemoFirebase(
     () => (firestore ? query(collection(firestore, 'posts'), orderBy('createdAt', 'desc')) : null),
@@ -106,21 +102,22 @@ export default function CommunityPage() {
     }
   };
   
-  const handlePostSubmit = async () => {
-    if ((!postContent.trim() && !postImage) || !user || !firestore || !imagekit) return;
+  const handlePostSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if ((!postContent.trim() && !postImage) || !user || !firestore || !formRef.current) return;
     
     setIsSubmitting(true);
     try {
         let imageUrl: string | undefined = undefined;
 
         if (postImage) {
-            const uploadResult = await imagekit.upload({
-                file: postImage,
-                fileName: postImage.name,
-                folder: `/posts/${user.uid}`,
-                useUniqueFileName: true,
-            });
-            imageUrl = uploadResult.url;
+            const formData = new FormData(formRef.current);
+            const result = await uploadImage(formData);
+            
+            if (!result.success) {
+                throw new Error(result.error || 'Image upload failed');
+            }
+            imageUrl = result.url;
         }
 
       await addDoc(collection(firestore, 'posts'), {
@@ -141,7 +138,7 @@ export default function CommunityPage() {
         toast({
             variant: 'destructive',
             title: 'Failed to post',
-            description: error.message || 'An error occurred during upload. Please try again.',
+            description: error.message || 'An error occurred. Please try again.',
         });
     } finally {
         setIsSubmitting(false);
@@ -171,34 +168,37 @@ export default function CommunityPage() {
             <ScrollArea className="flex-1">
                 <div className="p-4 md:p-6 space-y-6">
                 <Card>
-                    <CardContent className="p-4 space-y-4">
-                        <Textarea
-                            placeholder="What's on your mind?"
-                            value={postContent}
-                            onChange={(e) => setPostContent(e.target.value)}
-                            className="text-base"
-                            rows={3}
-                        />
-                        {imagePreview && (
-                            <div className="relative w-32 h-32">
-                                <Image src={imagePreview} alt="Image preview" fill className="rounded-md object-cover"/>
-                                <Button variant="destructive" size="icon" className="absolute top-1 right-1 h-6 w-6" onClick={removeImage}>
-                                    <X className="h-4 w-4" />
+                    <form ref={formRef} onSubmit={handlePostSubmit}>
+                        <CardContent className="p-4 space-y-4">
+                            <Textarea
+                                placeholder="What's on your mind?"
+                                value={postContent}
+                                onChange={(e) => setPostContent(e.target.value)}
+                                className="text-base"
+                                rows={3}
+                                name="content"
+                            />
+                            {imagePreview && (
+                                <div className="relative w-32 h-32">
+                                    <Image src={imagePreview} alt="Image preview" fill className="rounded-md object-cover"/>
+                                    <Button variant="destructive" size="icon" className="absolute top-1 right-1 h-6 w-6" onClick={removeImage}>
+                                        <X className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                            )}
+                            <div className="flex justify-between items-center">
+                                <Button type="button" variant="ghost" size="icon" onClick={() => fileInputRef.current?.click()}>
+                                    <Paperclip className="h-5 w-5 text-muted-foreground" />
+                                    <span className="sr-only">Attach image</span>
+                                </Button>
+                                <Input type="file" name="file" accept="image/*" ref={fileInputRef} onChange={handleImageChange} className="hidden" />
+                                <Button type="submit" disabled={isSubmitting || (!postContent.trim() && !postImage)}>
+                                    {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                    Post
                                 </Button>
                             </div>
-                        )}
-                        <div className="flex justify-between items-center">
-                            <Button variant="ghost" size="icon" onClick={() => fileInputRef.current?.click()}>
-                                <Paperclip className="h-5 w-5 text-muted-foreground" />
-                                <span className="sr-only">Attach image</span>
-                            </Button>
-                            <Input type="file" accept="image/*" ref={fileInputRef} onChange={handleImageChange} className="hidden" />
-                            <Button onClick={handlePostSubmit} disabled={isSubmitting || (!postContent.trim() && !postImage)}>
-                                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                Post
-                            </Button>
-                        </div>
-                    </CardContent>
+                        </CardContent>
+                    </form>
                 </Card>
 
                 {/* Posts Feed */}
