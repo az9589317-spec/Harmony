@@ -149,6 +149,11 @@
           "type": "string",
           "description": "Timestamp indicating when the post was created.",
           "format": "date-time"
+        },
+        "imageUrl": {
+          "type": "string",
+          "description": "URL of an optional image attached to the post.",
+          "format": "uri"
         }
       },
       "required": [
@@ -243,4 +248,3 @@
     "reasoning": "The Firestore data structure is designed to support the Harmony Hub application, focusing on user authentication, song uploads, and playlist management. It prioritizes security, scalability, and debuggability by adhering to the principles of Authorization Independence, Structural Segregation, and Access Modeling. Path-based ownership is used for private user data, while a root collection for posts allows for a global community feed. Explicit state modeling (if applicable in the future) and predictable schema patterns enhance debuggability.\n\nAuthorization Independence is achieved primarily through path-based ownership for songs. Each user has their own collection of songs under `/users/{userId}/songs/{songId}`. Security rules can then directly check `request.auth.uid == userId` without needing to `get()` parent documents. This enables atomic operations and simplifies security rules.\n\nStructural Segregation is applied by storing each user's songs in a dedicated subcollection under their user document (`/users/{userId}/songs`). This ensures that security rules for song access are consistent within the collection. User data is stored at `/users/{userId}`. Posts are stored in a root collection `/posts` to allow all users to read them for a community feed, while write access is restricted to the post owner."
   }
 }
-    

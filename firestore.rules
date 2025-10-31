@@ -106,9 +106,18 @@ service cloud.firestore {
         // For a create operation
         return request.auth.uid == request.resource.data.userId;
       }
+      
+      function incomingData() {
+        return request.resource.data;
+      }
 
       allow list, get: if isSignedIn();
-      allow create: if isSignedIn() && isNewPostOwner();
+      allow create: if isSignedIn() 
+                      && isNewPostOwner()
+                      && incomingData().content is string
+                      && incomingData().content.size() > 0
+                      && (!('imageUrl' in incomingData()) || (incomingData().imageUrl is string && incomingData().imageUrl.size() > 0));
+
       allow update, delete: if isSignedIn() && isPostOwner();
     }
   }
@@ -121,5 +130,3 @@ service firebase.storage {
     }
   }
 }
-
-    

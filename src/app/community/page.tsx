@@ -1,11 +1,13 @@
 'use client';
 
-import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { useUser, useFirestore, useCollection, useMemoFirebase, useFirebaseApp } from '@/firebase';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { collection, addDoc, serverTimestamp, query, orderBy } from 'firebase/firestore';
-import { Loader2, Send } from 'lucide-react';
+import { getStorage, ref as storageRef, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+import { Loader2, Send, Paperclip, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Card, CardContent } from '@/components/ui/card';
@@ -16,6 +18,8 @@ import { AppHeader } from '@/components/AppHeader';
 import { AppSidebar } from '@/components/AppSidebar';
 import { SidebarProvider, Sidebar, SidebarInset } from '@/components/ui/sidebar';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import Image from 'next/image';
+import { v4 as uuidv4 } from 'uuid';
 
 function PostCard({ post }: { post: Post }) {
     const getInitials = (name?: string | null) => {
@@ -37,7 +41,12 @@ function PostCard({ post }: { post: Post }) {
             <p className="font-semibold">{post.username}</p>
             <p className="text-xs text-muted-foreground">{timeAgo}</p>
           </div>
-          <p className="text-foreground/90 whitespace-pre-wrap">{post.content}</p>
+          <p className="text-foreground/90 whitespace-pre-wrap mt-1">{post.content}</p>
+          {post.imageUrl && (
+            <div className="mt-3 rounded-lg overflow-hidden border">
+                <Image src={post.imageUrl} alt="Post image" width={400} height={300} className="object-cover w-full h-auto" />
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>
@@ -48,11 +57,15 @@ function PostCard({ post }: { post: Post }) {
 export default function CommunityPage() {
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
+  const firebaseApp = useFirebaseApp();
   const router = useRouter();
   const { toast } = useToast();
-
+  
   const [postContent, setPostContent] = useState('');
+  const [postImage, setPostImage] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const postsQuery = useMemoFirebase(
     () => (firestore ? query(collection(firestore, 'posts'), orderBy('createdAt', 'desc')) : null),
@@ -65,19 +78,52 @@ export default function CommunityPage() {
       router.push('/login');
     }
   }, [user, isUserLoading, router]);
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setPostImage(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const removeImage = () => {
+    setPostImage(null);
+    setImagePreview(null);
+    if(fileInputRef.current) {
+        fileInputRef.current.value = "";
+    }
+  };
   
   const handlePostSubmit = async () => {
-    if (!postContent.trim() || !user || !firestore) return;
+    if ((!postContent.trim() && !postImage) || !user || !firestore || !firebaseApp) return;
+    
     setIsSubmitting(true);
     try {
+        let imageUrl: string | undefined = undefined;
+
+        if (postImage) {
+            const storage = getStorage(firebaseApp);
+            const imageId = uuidv4();
+            const postImageRef = storageRef(storage, `users/${user.uid}/post_images/${imageId}_${postImage.name}`);
+            const uploadTask = await uploadBytesResumable(postImageRef, postImage);
+            imageUrl = await getDownloadURL(uploadTask.ref);
+        }
+
       await addDoc(collection(firestore, 'posts'), {
         userId: user.uid,
         username: user.displayName || 'Anonymous',
         userImage: user.photoURL || null,
         content: postContent.trim(),
         createdAt: new Date().toISOString(),
+        ...(imageUrl && { imageUrl }),
       });
       setPostContent('');
+      removeImage();
     } catch (error: any) {
         toast({
             variant: 'destructive',
@@ -102,7 +148,6 @@ export default function CommunityPage() {
       <div className="h-screen w-full flex flex-col bg-card overflow-hidden">
         <div className="flex flex-1 overflow-hidden">
           <Sidebar>
-            {/* The onSelectPlaylist prop is not relevant here, but required */}
             <AppSidebar onSelectPlaylist={() => {}} />
           </Sidebar>
           <SidebarInset className="flex flex-col overflow-hidden !m-0 !rounded-none !shadow-none">
@@ -112,9 +157,8 @@ export default function CommunityPage() {
             />
             <ScrollArea className="flex-1">
                 <div className="p-4 md:p-6 space-y-6">
-                {/* Post Creation Form */}
                 <Card>
-                    <CardContent className="p-4 space-y-2">
+                    <CardContent className="p-4 space-y-4">
                         <Textarea
                             placeholder="What's on your mind?"
                             value={postContent}
@@ -122,8 +166,21 @@ export default function CommunityPage() {
                             className="text-base"
                             rows={3}
                         />
-                        <div className="flex justify-end">
-                            <Button onClick={handlePostSubmit} disabled={isSubmitting || !postContent.trim()}>
+                        {imagePreview && (
+                            <div className="relative w-32 h-32">
+                                <Image src={imagePreview} alt="Image preview" layout="fill" className="rounded-md object-cover"/>
+                                <Button variant="destructive" size="icon" className="absolute top-1 right-1 h-6 w-6" onClick={removeImage}>
+                                    <X className="h-4 w-4" />
+                                </Button>
+                            </div>
+                        )}
+                        <div className="flex justify-between items-center">
+                            <Button variant="ghost" size="icon" onClick={() => fileInputRef.current?.click()}>
+                                <Paperclip className="h-5 w-5 text-muted-foreground" />
+                                <span className="sr-only">Attach image</span>
+                            </Button>
+                            <Input type="file" accept="image/*" ref={fileInputRef} onChange={handleImageChange} className="hidden" />
+                            <Button onClick={handlePostSubmit} disabled={isSubmitting || (!postContent.trim() && !postImage)}>
                                 {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                 Post
                             </Button>
@@ -153,5 +210,3 @@ export default function CommunityPage() {
     </SidebarProvider>
   );
 }
-
-    

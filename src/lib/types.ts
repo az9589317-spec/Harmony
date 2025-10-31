@@ -30,6 +30,5 @@ export interface Post {
   userImage: string | null; // Denormalized for easy display
   content: string;
   createdAt: string; // ISO 8601 string
+  imageUrl?: string; // Optional image URL
 }
-
-    
