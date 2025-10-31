@@ -16,7 +16,6 @@ import {
   useFirestore,
   useCollection,
   useMemoFirebase,
-  useFirebaseApp,
 } from '@/firebase';
 import {
   collection,
@@ -24,6 +23,7 @@ import {
   setDoc,
   updateDoc,
   arrayUnion,
+  serverTimestamp,
 } from 'firebase/firestore';
 import { v4 as uuidv4 } from 'uuid';
 import { classifyMusicGenre } from '@/ai/flows/ai-classify-uploaded-music';
@@ -221,7 +221,6 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
         const formData = new FormData();
         formData.append('file', file);
         
-        // This will simulate some progress before the server action is complete
         updateTaskProgress(taskId, { progress: 50 });
 
         const result = await uploadMedia(formData, 'audio');
@@ -251,6 +250,7 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
           duration: duration,
           genre: genreResponse.genre || 'Unknown',
           albumArtUrl: randomAlbumArt,
+          createdAt: serverTimestamp(),
         };
   
         const songRef = doc(firestore, 'users', userId, 'songs', newSong.id);
@@ -319,7 +319,7 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
       'playlists',
       newPlaylistId
     );
-    const newPlaylist: Playlist = { id: newPlaylistId, name, songIds: [] };
+    const newPlaylist: Playlist = { id: newPlaylistId, name, songIds: [], createdAt: serverTimestamp() };
     await setDoc(playlistRef, newPlaylist);
   };
 

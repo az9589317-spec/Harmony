@@ -9,12 +9,14 @@ export interface Song {
   genre: string;
   albumArtUrl: string;
   userId: string;
+  createdAt: FieldValue;
 }
 
 export interface Playlist {
   id: string;
   name: string;
   songIds: string[];
+  createdAt: FieldValue;
 }
 
 export interface UploadTask {

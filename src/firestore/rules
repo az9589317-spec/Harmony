@@ -1,0 +1,132 @@
+/**
+ * @fileoverview Firestore Security Rules for Harmony Hub.
+ *
+ * Core Philosophy:
+ * This ruleset enforces a strict user-ownership model for personal data (songs, playlists)
+ * and allows authenticated users to create their own user profiles.
+ *
+ * Data Structure:
+ * - /users/{userId}: Stores user profiles.
+ * - /users/{userId}/songs/{songId}: Stores songs uploaded by each user.
+ * - /users/{userId}/playlists/{playlistId}: Stores playlists created by each user.
+ * - /posts/{postId}: Stores all posts for the community feed.
+ *
+ * Key Security Decisions:
+ * - Users can only create, update, or delete their own data (songs, playlists, posts).
+ * - Anyone can read posts in the community feed.
+ * - User listing is disallowed for privacy.
+ * - All write operations require authentication.
+ *
+ * Denormalization for Authorization:
+ * - The `userId` is embedded in song, playlist, and post documents to enforce user-ownership.
+ *   This allows security rules to efficiently verify ownership without additional `get()` calls.
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    /**
+     * @description Protects the /users collection, allowing only authenticated users to create their own profile.
+     * @path /users/{userId}
+     * @allow (create) User 'user_abc' can create /users/user_abc if authenticated.
+     * @deny (create) User 'user_xyz' cannot create /users/user_abc.
+     * @deny (get, list, update, delete) No one can get, list, update, or delete user documents directly.
+     * @principle Enforces user-ownership; authenticated user can create only their own profile.
+     */
+    match /users/{userId} {
+      allow create: if isSignedIn() && isOwner(userId) && request.resource.data.id == userId;
+      allow get: if false; // Disallow reading other user profiles for privacy
+      allow list: if false; // Disallow listing all users
+      allow update: if false; // Updates handled via specific functions/paths if needed
+      allow delete: if false;
+    }
+
+    /**
+     * @description Protects the /users/{userId}/songs collection, ensuring only the owner can manage their songs.
+     * @path /users/{userId}/songs/{songId}
+     * @allow (create) User 'user_abc' can create /users/user_abc/songs/song1 if authenticated.
+     * @allow (get, list) User 'user_abc' can read their own songs.
+     * @deny (create, update, delete) User 'user_xyz' cannot create, update, or delete /users/user_abc/songs/song1.
+     * @principle Enforces strict user-ownership for song management.
+     */
+    match /users/{userId}/songs/{songId} {
+      function isExistingOwner() {
+          return isOwner(userId) && resource != null;
+      }
+      allow create: if isSignedIn() && isOwner(userId) && request.resource.data.userId == userId;
+      allow get: if isSignedIn() && isOwner(userId);
+      allow list: if isSignedIn() && isOwner(userId);
+      allow update: if isSignedIn() && isExistingOwner() && request.resource.data.userId == resource.data.userId;
+      allow delete: if isSignedIn() && isExistingOwner();
+    }
+
+    /**
+     * @description Protects the /users/{userId}/playlists collection, ensuring only the owner can manage their playlists.
+     * @path /users/{userId}/playlists/{playlistId}
+     * @allow (create) User 'user_abc' can create /users/user_abc/playlists/playlist1 if authenticated.
+     * @allow (get, list) User 'user_abc' can read their own playlists.
+     * @deny (create, update, delete) User 'user_xyz' cannot create, update, or delete /users/user_abc/playlists/playlist1.
+     * @principle Enforces strict user-ownership for playlist management.
+     */
+    match /users/{userId}/playlists/{playlistId} {
+        function isExistingOwner() {
+            return isOwner(userId) && resource != null;
+        }
+
+        allow create: if isSignedIn() && isOwner(userId) && request.resource.data.userId == userId;
+        allow get: if isSignedIn() && isOwner(userId);
+        allow list: if isSignedIn() && isOwner(userId);
+        allow update: if isSignedIn() && isExistingOwner() && request.resource.data.userId == resource.data.userId;
+        allow delete: if isSignedIn() && isExistingOwner();
+    }
+
+    /**
+     * @description Manages the /posts collection for the community feed.
+     * @path /posts/{postId}
+     * @allow (list, get) Any authenticated user can read posts for the community feed.
+     * @allow (create) Authenticated users can create posts.
+     * @allow (update, delete) Only the owner of the post can update or delete it.
+     * @principle Allows a public read feed while restricting write access to owners.
+     */
+    match /posts/{postId} {
+      function isPostOwner() {
+        // For reads on an existing document
+        return request.auth.uid == resource.data.userId;
+      }
+
+       function isNewPostOwner() {
+        // For a create operation
+        return request.auth.uid == request.resource.data.userId;
+      }
+      
+      function incomingData() {
+        return request.resource.data;
+      }
+
+      allow list, get: if isSignedIn();
+      allow create: if isSignedIn() 
+                      && isNewPostOwner()
+                      && (incomingData().content.size() > 0 || incomingData().imageUrl.size() > 0)
+                      && incomingData().content is string
+                      && (!('imageUrl' in incomingData()) || (incomingData().imageUrl is string));
+
+      allow update, delete: if isSignedIn() && isPostOwner();
+    }
+  }
+}
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Allow users to read and write their own files in a 'users/{uid}' directory
+    match /users/{userId}/{allPaths=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+  }
+}
