@@ -1,10 +1,9 @@
 'use client';
 
-import { useUser, useFirestore, useCollection, useMemoFirebase, useFirebaseApp } from '@/firebase';
+import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import { collection, addDoc, serverTimestamp, query, orderBy } from 'firebase/firestore';
-import { getStorage, ref as storageRef, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { Loader2, Send, Paperclip, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,7 +18,7 @@ import { AppSidebar } from '@/components/AppSidebar';
 import { SidebarProvider, Sidebar, SidebarInset } from '@/components/ui/sidebar';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import Image from 'next/image';
-import { v4 as uuidv4 } from 'uuid';
+import ImageKit from 'imagekit-javascript';
 
 function PostCard({ post }: { post: Post }) {
     const getInitials = (name?: string | null) => {
@@ -57,7 +56,6 @@ function PostCard({ post }: { post: Post }) {
 export default function CommunityPage() {
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
-  const firebaseApp = useFirebaseApp();
   const router = useRouter();
   const { toast } = useToast();
   
@@ -66,6 +64,18 @@ export default function CommunityPage() {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const imagekit = useMemo(() => {
+    if (typeof window === 'undefined') return null;
+    return new ImageKit({
+        publicKey: "public_1Z4y6xViWvq28fxsG8fPbD4BZGY=",
+        urlEndpoint: "https://ik.imagekit.io/c9okxuh0pu",
+        // IMPORTANT: This authentication endpoint is a placeholder.
+        // You MUST create your own backend server to securely generate
+        // the authentication parameters.
+        authenticationEndpoint: "https://your-authentication-server.com/api/imagekit/auth"
+    });
+  }, []);
 
   const postsQuery = useMemoFirebase(
     () => (firestore ? query(collection(firestore, 'posts'), orderBy('createdAt', 'desc')) : null),
@@ -100,18 +110,20 @@ export default function CommunityPage() {
   };
   
   const handlePostSubmit = async () => {
-    if ((!postContent.trim() && !postImage) || !user || !firestore || !firebaseApp) return;
+    if ((!postContent.trim() && !postImage) || !user || !firestore || !imagekit) return;
     
     setIsSubmitting(true);
     try {
         let imageUrl: string | undefined = undefined;
 
         if (postImage) {
-            const storage = getStorage(firebaseApp);
-            const imageId = uuidv4();
-            const postImageRef = storageRef(storage, `users/${user.uid}/post_images/${imageId}_${postImage.name}`);
-            const uploadTask = await uploadBytesResumable(postImageRef, postImage);
-            imageUrl = await getDownloadURL(uploadTask.ref);
+            const uploadResult = await imagekit.upload({
+                file: postImage,
+                fileName: postImage.name,
+                folder: `/posts/${user.uid}`,
+                useUniqueFileName: true,
+            });
+            imageUrl = uploadResult.url;
         }
 
       await addDoc(collection(firestore, 'posts'), {
@@ -128,7 +140,7 @@ export default function CommunityPage() {
         toast({
             variant: 'destructive',
             title: 'Failed to post',
-            description: error.message,
+            description: error.message || 'An error occurred during upload. Please ensure your authentication server is running.',
         });
     } finally {
         setIsSubmitting(false);
@@ -210,5 +222,3 @@ export default function CommunityPage() {
     </SidebarProvider>
   );
 }
-
-    

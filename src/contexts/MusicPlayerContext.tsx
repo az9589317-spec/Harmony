@@ -152,7 +152,7 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
     const nextIndex =
       (currentTrackIndexInPlaylist + 1) % activePlaylistSongs.length;
     playTrack(nextIndex, activePlaylistId);
-  }, [currentTrackIndexInPlaylist, activePlaylistSongs, activePlaylistId, playTrack]);
+  }, [currentTrackIndexInPlaylist, activePlaylistSongs.length, activePlaylistId, playTrack]);
 
   useEffect(() => {
     const audio = audioRef.current;
