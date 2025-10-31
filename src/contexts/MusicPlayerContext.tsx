@@ -1,6 +1,6 @@
 'use client';
 
-import type { Song, Playlist } from '@/lib/types';
+import type { Song, Playlist, UploadTask } from '@/lib/types';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import React, {
   createContext,
@@ -17,12 +17,21 @@ import {
   useCollection,
   useMemoFirebase,
 } from '@/firebase';
-import { collection, doc, setDoc, deleteDoc, writeBatch } from 'firebase/firestore';
-import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { collection, doc, setDoc } from 'firebase/firestore';
+import ImageKit from 'imagekit-javascript';
+import { v4 as uuidv4 } from 'uuid';
+import { classifyMusicGenre } from '@/ai/flows/ai-classify-uploaded-music';
+
+// This is not secure and should be replaced with a server-side authentication endpoint
+const imagekit = new ImageKit({
+    publicKey: "public_1Z4y6xViWvq28fxsG8fPbD4BZGY=",
+    urlEndpoint: "https://ik.imagekit.io/c9okxuh0pu",
+});
 
 interface MusicPlayerContextType {
   songs: Song[];
   playlists: Playlist[];
+  uploadTasks: UploadTask[];
   currentTrackIndex: number | null;
   isPlaying: boolean;
   currentTrack: Song | null;
@@ -30,7 +39,7 @@ interface MusicPlayerContextType {
   duration: number;
   volume: number;
   activePlaylistId: string;
-  addSong: (song: Omit<Song, 'id' | 'url' | 'userId'>, file: File) => Promise<void>;
+  addSong: (file: File) => void;
   playTrack: (trackIndex: number, playlistId?: string) => void;
   togglePlayPause: () => void;
   playNext: () => void;
@@ -53,21 +62,19 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
 }) => {
   const { user } = useUser();
   const firestore = useFirestore();
-  const storage = getStorage();
 
   const songsRef = useMemoFirebase(
     () => (user ? collection(firestore, 'users', user.uid, 'songs') : null),
     [firestore, user]
   );
-  const { data: songsData, isLoading: songsLoading } = useCollection<Song>(songsRef);
+  const { data: songsData } = useCollection<Song>(songsRef);
   const songs = songsData || [];
 
   const playlistsRef = useMemoFirebase(
     () => (user ? collection(firestore, 'users', user.uid, 'playlists') : null),
     [firestore, user]
   );
-  const { data: playlistsData, isLoading: playlistsLoading } =
-    useCollection<Playlist>(playlistsRef);
+  const { data: playlistsData } = useCollection<Playlist>(playlistsRef);
 
   const [activePlaylistId, setActivePlaylistId] = useState('library');
   const [currentTrackIndexInPlaylist, setCurrentTrackIndexInPlaylist] =
@@ -77,13 +84,14 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
   const [duration, setDuration] = useState(0);
   const [volume, setVolumeState] = useState(0.8);
   const audioRef = useRef<HTMLAudioElement>(null);
+  const [uploadTasks, setUploadTasks] = useState<UploadTask[]>([]);
 
   const playlists: Playlist[] = useMemo(() => {
     const userPlaylists = playlistsData || [];
     const libraryPlaylist: Playlist = {
       id: 'library',
       name: 'My Library',
-      songIds: (songs || []).map((s) => s.id),
+      songIds: songs.map((s) => s.id),
     };
     return [libraryPlaylist, ...userPlaylists];
   }, [playlistsData, songs]);
@@ -124,30 +132,125 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
     };
   }, [currentTrack]);
 
-  const addSong = async (
-    song: Omit<Song, 'id'| 'url' | 'userId'>, file: File
-  ) => {
-    if (!user) return;
-    const songId = doc(collection(firestore, 'temp')).id;
-    
-    // Upload file to Firebase Storage
-    const storageRef = ref(storage, `users/${user.uid}/songs/${songId}_${file.name}`);
-    const uploadResult = await uploadBytes(storageRef, file);
-    const downloadURL = await getDownloadURL(uploadResult.ref);
-
-    const songRef = doc(firestore, 'users', user.uid, 'songs', songId);
-    const newSong: Song = {
-      ...song,
-      id: songId,
-      userId: user.uid,
-      url: downloadURL,
-      albumArtUrl:
-        song.albumArtUrl ||
-        PlaceHolderImages[Math.floor(Math.random() * PlaceHolderImages.length)]
-          .imageUrl,
-    };
-    await setDoc(songRef, newSong);
+  const updateTaskProgress = (taskId: string,-
+                                  progress: Partial<UploadTask>) => {
+    setUploadTasks(prevTasks =>
+      prevTasks.map(task =>
+        task.id === taskId ? { ...task, ...progress } : task
+      )
+    );
   };
+
+  const getAudioDuration = (file: File): Promise<number> => {
+    return new Promise((resolve) => {
+      const audio = document.createElement('audio');
+      audio.src = URL.createObjectURL(file);
+      audio.onloadedmetadata = () => {
+        resolve(audio.duration);
+        URL.revokeObjectURL(audio.src);
+      };
+      audio.onerror = () => {
+        resolve(0);
+        URL.revokeObjectURL(audio.src);
+      };
+    });
+  };
+
+  const addSong = async (file: File) => {
+    if (!user) return;
+    
+    const taskId = uuidv4();
+    const newTask: UploadTask = {
+      id: taskId,
+      fileName: file.name,
+      progress: 0,
+      status: 'uploading',
+    };
+    setUploadTasks(prev => [...prev, newTask]);
+
+    try {
+      // 1. Get Authentication Parameters from your backend
+      // This is a placeholder for where you would fetch auth params from your server
+      const getAuthenticationParameters = async () => {
+        // In a real app, you'd fetch this from a secure server-side endpoint
+        // that uses your private key to generate a token and expiry.
+        // DO NOT expose your private key on the client.
+        const response = await fetch('https://imagekit-auth-server-fly.dev/api/imagekit/auth');
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Failed to fetch auth params: ${errorText}`);
+        }
+        return response.json();
+      }
+
+      const authParams = await getAuthenticationParameters();
+
+      // 2. Upload to ImageKit
+      const uploadResponse = await imagekit.upload({
+        file: file,
+        fileName: file.name,
+        ...authParams,
+        useUniqueFileName: true,
+        folder: `/users/${user.uid}/songs/`,
+      }, (err, result) => {
+          if (err) {
+              throw err;
+          }
+          if (result) {
+            updateTaskProgress(taskId, { progress: 100, status: 'processing' });
+          }
+      });
+      
+      const downloadURL = uploadResponse.url;
+
+      updateTaskProgress(taskId, { status: 'processing' });
+
+      const [genreResponse, duration] = await Promise.all([
+        classifyMusicGenre({ musicDataUri: await fileToDataUri(file) }),
+        getAudioDuration(file),
+      ]);
+
+      const randomAlbumArt =
+        PlaceHolderImages[Math.floor(Math.random() * PlaceHolderImages.length)]
+          .imageUrl;
+
+      const newSong: Song = {
+        id: uploadResponse.fileId,
+        userId: user.uid,
+        title: file.name.replace(/\.[^/.]+$/, ""),
+        artist: 'Unknown Artist',
+        url: downloadURL,
+        duration,
+        genre: genreResponse.genre || 'Unknown',
+        albumArtUrl: randomAlbumArt,
+      };
+
+      const songRef = doc(firestore, 'users', user.uid, 'songs', newSong.id);
+      await setDoc(songRef, newSong);
+      
+      updateTaskProgress(taskId, { status: 'success' });
+      // Optionally remove successful uploads after a delay
+      setTimeout(() => {
+        setUploadTasks(prev => prev.filter(t => t.id !== taskId));
+      }, 5000);
+
+    } catch (error) {
+      console.error("Upload failed:", error);
+      updateTaskProgress(taskId, {
+        status: 'error',
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  };
+
+  const fileToDataUri = (file: File) => {
+    return new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
+  }
 
   const playTrack = (
     trackIndexInPlaylist: number,
@@ -245,6 +348,7 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
       value={{
         songs,
         playlists,
+        uploadTasks,
         currentTrackIndex: currentTrackIndexInPlaylist,
         isPlaying,
         currentTrack,

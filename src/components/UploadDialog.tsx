@@ -14,10 +14,8 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useMusicPlayer } from '@/contexts/MusicPlayerContext';
-import { classifyMusicGenre } from '@/ai/flows/ai-classify-uploaded-music';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Upload } from 'lucide-react';
-import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { useUser } from '@/firebase';
 
 export function UploadDialog() {
@@ -25,7 +23,6 @@ export function UploadDialog() {
   const { user } = useUser();
   const { toast } = useToast();
   const [file, setFile] = useState<File | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
   const [open, setOpen] = useState(false);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -33,21 +30,6 @@ export function UploadDialog() {
       setFile(e.target.files[0]);
     }
   };
-
-  const getAudioDuration = (file: File): Promise<number> => {
-    return new Promise((resolve) => {
-        const audio = document.createElement('audio');
-        audio.src = URL.createObjectURL(file);
-        audio.onloadedmetadata = () => {
-            resolve(audio.duration);
-            URL.revokeObjectURL(audio.src);
-        };
-        audio.onerror = () => {
-            resolve(0); // Resolve with 0 if there's an error loading the audio
-            URL.revokeObjectURL(audio.src);
-        }
-    });
-  }
 
   const handleSubmit = async () => {
     if (!file || !user) {
@@ -58,70 +40,18 @@ export function UploadDialog() {
         });
         return;
     }
+    
+    // The addSong function now handles the upload in the background.
+    // We can close the dialog immediately.
+    addSong(file);
 
-    setIsLoading(true);
+    toast({
+      title: "Upload Started",
+      description: `"${file.name}" is now uploading in the background.`,
+    });
 
-    try {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = async () => {
-        const musicDataUri = reader.result as string;
-        
-        try {
-            const [genreResponse, duration] = await Promise.all([
-                classifyMusicGenre({ musicDataUri }),
-                getAudioDuration(file)
-            ]);
-
-            const randomAlbumArt = PlaceHolderImages[Math.floor(Math.random() * PlaceHolderImages.length)].imageUrl;
-
-            const newSong = {
-              title: file.name.replace(/\.[^/.]+$/, ""),
-              artist: 'Unknown Artist',
-              duration: duration,
-              genre: genreResponse.genre || 'Unknown',
-              albumArtUrl: randomAlbumArt,
-              userId: user.uid, // Pass the user ID
-            };
-
-            await addSong(newSong, file);
-
-            toast({
-              title: "Song Uploaded!",
-              description: `"${newSong.title}" was added to your library.`,
-            });
-
-            setFile(null);
-            setOpen(false);
-        } catch (error) {
-            console.error("Error during song processing:", error);
-            toast({
-                variant: 'destructive',
-                title: 'Processing Failed',
-                description: 'Could not classify or save the song.',
-            });
-        } finally {
-            setIsLoading(false);
-        }
-      };
-      reader.onerror = (error) => {
-        console.error("FileReader error:", error);
-        toast({
-            variant: 'destructive',
-            title: 'File Read Error',
-            description: 'Could not read the selected file.',
-        });
-        setIsLoading(false);
-      }
-    } catch (error) {
-      console.error("Outer error handler:",error);
-      toast({
-        variant: 'destructive',
-        title: 'Upload Failed',
-        description: 'An unexpected error occurred during upload.',
-      });
-      setIsLoading(false);
-    }
+    setFile(null);
+    setOpen(false);
   };
 
   return (
@@ -129,7 +59,7 @@ export function UploadDialog() {
       <DialogTrigger asChild>
         <Button size="sm">
           <Upload className="mr-2 h-4 w-4" />
-          Upload
+          <span>Upload</span>
         </Button>
       </DialogTrigger>
       <DialogContent>
@@ -144,12 +74,11 @@ export function UploadDialog() {
           <Input id="music-file" type="file" accept="audio/*" onChange={handleFileChange} />
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)} disabled={isLoading}>
+          <Button variant="outline" onClick={() => setOpen(false)}>
             Cancel
           </Button>
-          <Button onClick={handleSubmit} disabled={isLoading || !file}>
-            {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {isLoading ? 'Uploading...' : 'Upload & Classify'}
+          <Button onClick={handleSubmit} disabled={!file}>
+            Upload & Classify
           </Button>
         </DialogFooter>
       </DialogContent>
