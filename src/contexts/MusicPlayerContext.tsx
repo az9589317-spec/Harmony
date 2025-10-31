@@ -1,3 +1,4 @@
+
 'use client';
 
 import type { Song, Playlist, UploadTask } from '@/lib/types';
@@ -222,6 +223,7 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
         const formData = new FormData();
         formData.append('file', file);
         
+        // Indicate that the file is now being processed by the server
         updateTaskProgress(taskId, { progress: 50, status: 'uploading' });
 
         const result = await uploadMedia(formData, 'audio');
@@ -229,9 +231,9 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
         if (!result.success || !result.url) {
           throw new Error(result.error || 'Music upload failed on server');
         }
-
-        updateTaskProgress(taskId, { progress: 100, status: 'processing' });
+        
         const downloadURL = result.url;
+        updateTaskProgress(taskId, { progress: 100, status: 'processing' });
 
         const [genreResponse, duration] = await Promise.all([
           classifyMusicGenre({ musicDataUri: await fileToDataUri(file) }),
@@ -378,3 +380,4 @@ export const useMusicPlayer = () => {
   }
   return context;
 };
+ 
