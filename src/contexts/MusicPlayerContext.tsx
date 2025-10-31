@@ -45,7 +45,7 @@ interface MusicPlayerContextType {
   duration: number;
   volume: number;
   activePlaylistId: string;
-  addSong: (file: File) => void;
+  addSong: (file: File, userId: string) => void;
   playTrack: (trackIndex: number, playlistId?: string) => void;
   togglePlayPause: () => void;
   playNext: () => void;
@@ -121,6 +121,39 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
       ? activePlaylistSongs[currentTrackIndexInPlaylist]
       : null;
 
+  const playTrack = useCallback(
+    (
+      trackIndexInPlaylist: number,
+      playlistId: string = activePlaylistId
+    ) => {
+      if (playlistId !== activePlaylistId) {
+        setActivePlaylistId(playlistId);
+      }
+      const targetPlaylistSongs = getPlaylistSongs(playlistId);
+      const track = targetPlaylistSongs[trackIndexInPlaylist];
+
+      if (track && audioRef.current) {
+        if (track.url) {
+          audioRef.current.src = track.url;
+          audioRef.current.crossOrigin = 'anonymous';
+        }
+        setCurrentTrackIndexInPlaylist(trackIndexInPlaylist);
+        audioRef.current
+          .play()
+          .then(() => setIsPlaying(true))
+          .catch((e) => console.error('Playback failed', e));
+      }
+    },
+    [activePlaylistId, getPlaylistSongs]
+  );
+
+  const playNext = useCallback(() => {
+    if (currentTrackIndexInPlaylist === null) return;
+    const nextIndex =
+      (currentTrackIndexInPlaylist + 1) % activePlaylistSongs.length;
+    playTrack(nextIndex, activePlaylistId);
+  }, [currentTrackIndexInPlaylist, activePlaylistSongs, activePlaylistId, playTrack]);
+
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -138,14 +171,7 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
       audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
       audio.removeEventListener('ended', handleEnded);
     };
-  }, [currentTrack]); // Dependency on currentTrack is correct here
-
-  const playNext = useCallback(() => {
-    if (currentTrackIndexInPlaylist === null) return;
-    const nextIndex =
-      (currentTrackIndexInPlaylist + 1) % activePlaylistSongs.length;
-    playTrack(nextIndex, activePlaylistId);
-  }, [currentTrackIndexInPlaylist, activePlaylistSongs, activePlaylistId, playTrack]);
+  }, [playNext]);
 
   const updateTaskProgress = (
     taskId: string,
@@ -182,8 +208,8 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
     });
   };
 
-  const addSong = async (file: File) => {
-    if (!user) return;
+  const addSong = async (file: File, userId: string) => {
+    if (!userId) return;
 
     const taskId = uuidv4();
     const songId = uuidv4();
@@ -197,7 +223,7 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
 
     try {
       const storage = getStorage(firebaseApp);
-      const storageRef = ref(storage, `users/${user.uid}/songs/${songId}_${file.name}`);
+      const storageRef = ref(storage, `users/${userId}/songs/${songId}_${file.name}`);
       const uploadTask = uploadBytesResumable(storageRef, file);
 
       uploadTask.on(
@@ -229,7 +255,7 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
     
           const newSong: Song = {
             id: songId,
-            userId: user.uid,
+            userId: userId,
             title: file.name.replace(/\.[^/.]+$/, ''),
             artist: 'Unknown Artist',
             url: downloadURL,
@@ -238,7 +264,7 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
             albumArtUrl: randomAlbumArt,
           };
     
-          const songRef = doc(firestore, 'users', user.uid, 'songs', newSong.id);
+          const songRef = doc(firestore, 'users', userId, 'songs', newSong.id);
           await setDoc(songRef, newSong);
     
           updateTaskProgress(taskId, { status: 'success' });
@@ -257,29 +283,6 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
             ? error.message
             : 'Unknown error during upload.',
       });
-    }
-  };
-
-  const playTrack = (
-    trackIndexInPlaylist: number,
-    playlistId: string = activePlaylistId
-  ) => {
-    if (playlistId !== activePlaylistId) {
-      setActivePlaylistId(playlistId);
-    }
-    const targetPlaylistSongs = getPlaylistSongs(playlistId);
-    const track = targetPlaylistSongs[trackIndexInPlaylist];
-
-    if (track && audioRef.current) {
-      if (track.url) {
-        audioRef.current.src = track.url;
-        audioRef.current.crossOrigin = 'anonymous';
-      }
-      setCurrentTrackIndexInPlaylist(trackIndexInPlaylist);
-      audioRef.current
-        .play()
-        .then(() => setIsPlaying(true))
-        .catch((e) => console.error('Playback failed', e));
     }
   };
 
