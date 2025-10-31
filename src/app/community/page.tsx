@@ -134,6 +134,7 @@ export default function CommunityPage() {
       setPostContent('');
       removeImage();
     } catch (error: any) {
+        console.error("Post submission error:", error);
         toast({
             variant: 'destructive',
             title: 'Failed to post',
