@@ -40,13 +40,13 @@ export function MusicPlayerControls() {
   return (
     <footer className="h-24 bg-card border-t shrink-0 p-2 sm:p-4 flex items-center gap-2 sm:gap-6 z-10 shadow-inner">
       <div 
-        className="flex items-center gap-2 sm:gap-4 w-32 sm:w-64 cursor-pointer"
+        className="flex items-center gap-2 sm:gap-4 w-full sm:w-64 cursor-pointer"
         onClick={togglePlayerSheet}
       >
         {currentTrack ? (
           <>
             <AlbumArt src={currentTrack.albumArtUrl} alt={currentTrack.title} className="w-10 h-10 sm:w-14 sm:h-14" />
-            <div className="hidden sm:block">
+            <div className="flex-1 overflow-hidden">
               <p className="font-semibold text-sm truncate">{currentTrack.title}</p>
               <p className="text-xs text-muted-foreground truncate">{currentTrack.artist}</p>
             </div>
@@ -64,7 +64,7 @@ export function MusicPlayerControls() {
         )}
       </div>
 
-      <div className="flex-1 flex flex-col items-center gap-2">
+      <div className="hidden flex-1 sm:flex flex-col items-center gap-2">
         <div className="flex items-center gap-2 sm:gap-4">
           <Button variant="ghost" size="icon" onClick={playPrevious} disabled={!currentTrack}>
             <SkipBack className="h-5 w-5" />
@@ -87,6 +87,14 @@ export function MusicPlayerControls() {
             />
             <span className="text-xs text-muted-foreground w-10">{formatDuration(duration)}</span>
         </div>
+      </div>
+      <div className="flex sm:hidden items-center gap-2">
+          <Button variant="default" size="icon" className="w-10 h-10 rounded-full" onClick={togglePlayPause} disabled={!currentTrack}>
+            {isPlaying ? <Pause className="h-5 w-5" fill="currentColor"/> : <Play className="h-5 w-5" fill="currentColor"/>}
+          </Button>
+          <Button variant="ghost" size="icon" onClick={playNext} disabled={!currentTrack}>
+            <SkipForward className="h-5 w-5" />
+          </Button>
       </div>
 
       <div className="hidden md:flex items-center gap-2 w-32 sm:w-48">

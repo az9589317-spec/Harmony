@@ -98,7 +98,7 @@ export function SongList({ songs, playlistId }: SongListProps) {
                 <TableCell className="text-right text-muted-foreground">
                   {formatDuration(song.duration)}
                 </TableCell>
-                <TableCell onClick={(e) => e.stopPropagation()} className="px-2 md:px-4">
+                <TableCell onClick={(e) => e.stopPropagation()} className="px-0 md:px-4 w-10 md:w-12">
                   <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                           <button className="p-2 opacity-0 group-hover:opacity-100 focus:opacity-100 rounded-full hover:bg-secondary">
