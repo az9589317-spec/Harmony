@@ -110,10 +110,6 @@ export function SongList({ songs, playlistId }: SongListProps) {
             <Music className="w-16 h-16 mb-4"/>
             <h2 className="text-xl font-semibold">This playlist is empty</h2>
             <p className="mt-2 mb-4">Add songs from your library to this playlist.</p>
-            <Button onClick={handleAddSongsClick}>
-              <Plus className="mr-2 h-4 w-4" />
-              Add Songs
-            </Button>
         </div>
     );
   }

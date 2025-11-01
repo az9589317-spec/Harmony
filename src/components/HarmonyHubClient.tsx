@@ -11,6 +11,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { SidebarProvider, Sidebar, SidebarInset } from './ui/sidebar';
 import { ExpandedPlayerSheet } from './ExpandedPlayerSheet';
 import { UploadProgressBar } from './UploadProgressBar';
+import { Button } from './ui/button';
+import { Plus } from 'lucide-react';
 
 export function HarmonyHubClient() {
   const { songs, playlists, getPlaylistSongs, activePlaylistId, setActivePlaylistId } = useMusicPlayer();
@@ -63,6 +65,14 @@ export function HarmonyHubClient() {
             />
             <UploadProgressBar />
             <ScrollArea className="flex-1">
+              {activePlaylistId !== 'library' && !searchTerm && (
+                <div className="p-4 md:p-6 pb-0">
+                  <Button onClick={() => setActivePlaylistId('library')}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Songs
+                  </Button>
+                </div>
+              )}
               <SongList songs={songsToDisplay} playlistId={activePlaylistId} />
             </ScrollArea>
           </SidebarInset>
