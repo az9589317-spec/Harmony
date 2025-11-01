@@ -13,22 +13,32 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
+    DropdownMenuSeparator,
     DropdownMenuSub,
     DropdownMenuSubContent,
     DropdownMenuSubTrigger,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { AlbumArt } from './AlbumArt';
-import { Clock, MoreHorizontal, Music, Plus, Play, Pencil } from 'lucide-react';
+import { Clock, MoreHorizontal, Music, Plus, Play, Pencil, Trash2, Loader2 } from 'lucide-react';
 import { EditSongDialog } from './EditSongDialog';
 import { useUser } from '@/firebase';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Card, CardContent } from './ui/card';
 import { Button } from './ui/button';
-import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 
 interface SongListProps {
@@ -43,7 +53,7 @@ function formatDuration(seconds: number) {
   return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
 }
 
-const SongItemMenu = ({ song, onEdit }: { song: Song, onEdit: (song: Song, e: React.MouseEvent) => void }) => {
+const SongItemMenu = ({ song, onEdit, onDelete }: { song: Song, onEdit: (song: Song, e: React.MouseEvent) => void, onDelete: (song: Song, e: React.MouseEvent) => void }) => {
     const { user } = useUser();
     const { playlists, addSongToPlaylist } = useMusicPlayer();
     
@@ -70,10 +80,17 @@ const SongItemMenu = ({ song, onEdit }: { song: Song, onEdit: (song: Song, e: Re
                     </DropdownMenuSubContent>
                 </DropdownMenuSub>
                 {user && user.uid === song.userId && (
-                  <DropdownMenuItem onClick={(e) => onEdit(song, e)}>
-                      <Pencil className="mr-2 h-4 w-4"/>
-                      Edit Song
-                  </DropdownMenuItem>
+                    <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={(e) => onEdit(song, e)}>
+                            <Pencil className="mr-2 h-4 w-4"/>
+                            Edit Song
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={(e) => onDelete(song, e)} className="text-destructive">
+                            <Trash2 className="mr-2 h-4 w-4"/>
+                            Delete Song
+                        </DropdownMenuItem>
+                    </>
                 )}
             </DropdownMenuContent>
         </DropdownMenu>
@@ -82,10 +99,13 @@ const SongItemMenu = ({ song, onEdit }: { song: Song, onEdit: (song: Song, e: Re
 
 
 export function SongList({ songs, playlistId }: SongListProps) {
-  const { playTrack, currentTrack, setActivePlaylistId } = useMusicPlayer();
+  const { playTrack, currentTrack, deleteSong } = useMusicPlayer();
   const [songToEdit, setSongToEdit] = useState<Song | null>(null);
+  const [songToDelete, setSongToDelete] = useState<Song | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const isMobile = useIsMobile();
   const [mobileLimit, setMobileLimit] = useState(15);
+  const { toast } = useToast();
   
   const handleRowClick = (song: Song, index: number) => {
     playTrack(index, playlistId);
@@ -95,6 +115,33 @@ export function SongList({ songs, playlistId }: SongListProps) {
     e.stopPropagation();
     setSongToEdit(song);
   };
+
+  const handleDeleteRequest = (song: Song, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSongToDelete(song);
+  }
+
+  const confirmDelete = async () => {
+    if (!songToDelete) return;
+
+    setIsDeleting(true);
+    try {
+        await deleteSong(songToDelete.id);
+        toast({
+            title: "Song Deleted",
+            description: `"${songToDelete.title}" has been removed from your library.`
+        })
+    } catch (error: any) {
+        toast({
+            variant: "destructive",
+            title: "Delete Failed",
+            description: error.message || "Could not delete the song. You may not have permission."
+        })
+    } finally {
+        setIsDeleting(false);
+        setSongToDelete(null);
+    }
+  }
 
   if (songs.length === 0) {
     if (playlistId === 'library') {
@@ -136,7 +183,7 @@ export function SongList({ songs, playlistId }: SongListProps) {
                         </div>
                     </div>
                     <div className="absolute top-0 right-0">
-                        <SongItemMenu song={song} onEdit={handleEdit} />
+                        <SongItemMenu song={song} onEdit={handleEdit} onDelete={handleDeleteRequest} />
                     </div>
                     <div className="p-2 min-w-0">
                         <p className="font-medium truncate text-sm">{song.title}</p>
@@ -198,7 +245,7 @@ export function SongList({ songs, playlistId }: SongListProps) {
               </TableCell>
               <TableCell onClick={(e) => e.stopPropagation()} className="px-0 md:px-4 w-10 md:w-12">
                 <div className="opacity-0 group-hover:opacity-100 focus-within:opacity-100">
-                    <SongItemMenu song={song} onEdit={handleEdit} />
+                    <SongItemMenu song={song} onEdit={handleEdit} onDelete={handleDeleteRequest} />
                 </div>
               </TableCell>
             </TableRow>
@@ -219,6 +266,23 @@ export function SongList({ songs, playlistId }: SongListProps) {
           onOpenChange={(isOpen) => !isOpen && setSongToEdit(null)}
         />
       )}
+       <AlertDialog open={!!songToDelete} onOpenChange={(isOpen) => !isOpen && setSongToDelete(null)}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+                This action cannot be undone. This will permanently delete &quot;{songToDelete?.title}&quot; from your library and all playlists.
+            </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} disabled={isDeleting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Delete
+            </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+    </AlertDialog>
     </>
   );
 }

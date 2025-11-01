@@ -29,6 +29,7 @@ import {
   arrayUnion,
   serverTimestamp,
   query,
+  deleteDoc,
 } from 'firebase/firestore';
 import { v4 as uuidv4 } from 'uuid';
 import { classifyMusicGenre } from '@/ai/flows/ai-classify-uploaded-music';
@@ -65,6 +66,7 @@ interface MusicPlayerContextType {
   getActivePlaylistSongs: () => Song[];
   setActivePlaylistId: (playlistId: string) => void;
   updateSong: (songId: string, updatedData: Partial<Song>) => Promise<void>;
+  deleteSong: (songId: string) => Promise<void>;
   clearTask: (taskId: string) => void;
 }
 
@@ -475,6 +477,25 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
       throw permissionError;
     });
   };
+  
+  const deleteSong = async (songId: string) => {
+    if (!user || !firestore) {
+      throw new Error("User not authenticated or Firestore not available.");
+    }
+    const songToDelete = songs.find(s => s.id === songId);
+    if (!songToDelete || songToDelete.userId !== user.uid) {
+        throw new Error("Song not found or you don't have permission to delete it.");
+    }
+    const songRef = doc(firestore, 'users', user.uid, 'songs', songId);
+    return deleteDoc(songRef).catch((serverError) => {
+        const permissionError = new FirestorePermissionError({
+            path: songRef.path,
+            operation: 'delete',
+        });
+        errorEmitter.emit('permission-error', permissionError);
+        throw permissionError;
+    });
+  };
 
   const togglePlayerSheet = () => {
     setIsPlayerSheetOpen(prev => !prev);
@@ -509,6 +530,7 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
         getActivePlaylistSongs: () => activePlaylistSongs,
         setActivePlaylistId,
         updateSong,
+        deleteSong,
         clearTask,
       }}
     >
