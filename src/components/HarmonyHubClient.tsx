@@ -62,11 +62,15 @@ export function HarmonyHubClient() {
           </Sidebar>
           <SidebarInset className="relative flex flex-col overflow-hidden !m-0 !rounded-none !shadow-none">
             <AppHeader 
-              playlistName={playlistName}
               onSearchChange={handleSearchChange}
             />
             <UploadProgressBar />
             <ScrollArea className="flex-1">
+              <div className="px-4 pt-6 md:px-6">
+                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
+                  {playlistName}
+                </h1>
+              </div>
               <SongList 
                 songs={songsToDisplay} 
                 playlistId={activePlaylistId} 

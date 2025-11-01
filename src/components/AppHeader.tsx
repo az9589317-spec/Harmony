@@ -23,11 +23,10 @@ import { useIsMobile } from '@/hooks/use-mobile';
 
 
 interface AppHeaderProps {
-  playlistName: string;
   onSearchChange: (term: string) => void;
 }
 
-export function AppHeader({ playlistName, onSearchChange }: AppHeaderProps) {
+export function AppHeader({ onSearchChange }: AppHeaderProps) {
   const { user } = useUser();
   const auth = useAuth();
   const router = useRouter();
@@ -65,10 +64,10 @@ export function AppHeader({ playlistName, onSearchChange }: AppHeaderProps) {
         <div className="flex items-center gap-2">
              <div className="flex items-center gap-2 md:hidden">
                 <Headphones className="w-6 h-6 text-accent" />
+                 <h1 className="text-lg sm:text-xl font-bold tracking-tight font-headline">
+                    Harmony Hub
+                 </h1>
             </div>
-            <h1 className="text-lg sm:text-xl font-bold tracking-tight font-headline truncate max-w-[150px] sm:max-w-xs">
-              {playlistName}
-            </h1>
         </div>
       </div>
 

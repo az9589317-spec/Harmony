@@ -82,7 +82,7 @@ const SongItemMenu = ({ song, onEdit }: { song: Song, onEdit: (song: Song, e: Re
 
 
 export function SongList({ songs, playlistId }: SongListProps) {
-  const { playTrack, currentTrack } = useMusicPlayer();
+  const { playTrack, currentTrack, setActivePlaylistId } = useMusicPlayer();
   const [songToEdit, setSongToEdit] = useState<Song | null>(null);
   const isMobile = useIsMobile();
   const [mobileLimit, setMobileLimit] = useState(15);
@@ -111,7 +111,6 @@ export function SongList({ songs, playlistId }: SongListProps) {
         <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground p-8">
             <Music className="w-16 h-16 mb-4"/>
             <h2 className="text-xl font-semibold">This playlist is empty</h2>
-            <p className="mt-2 mb-4">Click "Add Songs" to build your playlist.</p>
         </div>
     );
   }
