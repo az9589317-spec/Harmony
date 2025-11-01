@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useUser, useFirestore, errorEmitter, FirestorePermissionError } from '@/firebase';
@@ -58,7 +59,8 @@ function PostCard({ post }: { post: Post }) {
         formatDistanceToNow((post.createdAt as Timestamp).toDate(), { addSuffix: true }) : 
         'just now';
 
-    const hasLiked = useMemo(() => user && post.likes.includes(user.uid), [post.likes, user]);
+    const postLikes = post.likes || [];
+    const hasLiked = useMemo(() => user && postLikes.includes(user.uid), [postLikes, user]);
 
     const handleLike = async () => {
         if (!user || !firestore) {
@@ -151,7 +153,7 @@ function PostCard({ post }: { post: Post }) {
         <div className="flex items-center gap-4 text-muted-foreground">
             <Button variant="ghost" size="sm" className="flex items-center gap-1.5" onClick={handleLike}>
                 <Heart className={cn("h-4 w-4", hasLiked && "fill-red-500 text-red-500")} />
-                <span className="text-sm">{post.likes.length}</span>
+                <span className="text-sm">{postLikes.length}</span>
             </Button>
             <Button variant="ghost" size="sm" className="flex items-center gap-1.5" onClick={() => setIsCommenting(!isCommenting)}>
                 <MessageSquare className="h-4 w-4" />
