@@ -135,7 +135,7 @@ export function ExpandedPlayerSheet() {
                     </Button>
                 </div>
                 
-                {isMobile && (
+                {!isMobile && (
                     <div className="flex items-center gap-2 pt-4">
                         <Button variant="ghost" size="icon" onClick={() => setVolume(volume > 0 ? 0 : 0.5)} className="hover:bg-white/20">
                             {volume === 0 ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
