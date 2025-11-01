@@ -62,15 +62,14 @@ export function AppHeader({ playlistName, onSearchChange }: AppHeaderProps) {
           <span className="sr-only">Toggle Sidebar</span>
         </Button>
         
-        {/* Show logo on mobile */}
-        <div className="flex items-center gap-2 md:hidden">
-            <Headphones className="w-6 h-6 text-accent" />
+        <div className="flex items-center gap-2">
+             <div className="flex items-center gap-2 md:hidden">
+                <Headphones className="w-6 h-6 text-accent" />
+            </div>
+            <h1 className="text-lg sm:text-xl font-bold tracking-tight font-headline truncate max-w-[150px] sm:max-w-xs">
+              {playlistName}
+            </h1>
         </div>
-
-        {/* Show playlist name on desktop */}
-        <h1 className="hidden md:block text-lg sm:text-xl font-bold tracking-tight font-headline truncate max-w-[150px] sm:max-w-xs">
-          {playlistName}
-        </h1>
       </div>
 
       <div className="flex flex-1 items-center justify-end gap-2 sm:gap-4">
