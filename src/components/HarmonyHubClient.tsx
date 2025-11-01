@@ -61,26 +61,24 @@ export function HarmonyHubClient() {
             <AppSidebar onSelectPlaylist={handleSelectPlaylist} />
           </Sidebar>
           <SidebarInset className="relative flex flex-col overflow-hidden !m-0 !rounded-none !shadow-none">
-            <AppHeader 
-              onSearchChange={handleSearchChange}
-            />
+            <AppHeader />
             <UploadProgressBar />
+            <div className="flex justify-between items-center px-4 pt-6 md:px-6">
+              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
+                {playlistName}
+              </h1>
+                {activePlaylistId !== 'library' && !searchTerm && (
+                  <Button 
+                      variant="ghost"
+                      size="icon" 
+                      onClick={() => setIsAddSongsDialogOpen(true)}
+                  >
+                      <Plus className="h-6 w-6" />
+                      <span className="sr-only">Add Songs</span>
+                  </Button>
+              )}
+            </div>
             <ScrollArea className="flex-1">
-              <div className="flex justify-between items-center px-4 pt-6 md:px-6">
-                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
-                  {playlistName}
-                </h1>
-                 {activePlaylistId !== 'library' && !searchTerm && (
-                    <Button 
-                        variant="ghost"
-                        size="icon" 
-                        onClick={() => setIsAddSongsDialogOpen(true)}
-                    >
-                        <Plus className="h-6 w-6" />
-                        <span className="sr-only">Add Songs</span>
-                    </Button>
-                )}
-              </div>
               <SongList 
                 songs={songsToDisplay} 
                 playlistId={activePlaylistId} 
