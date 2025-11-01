@@ -17,20 +17,23 @@ import { AddSongsDialog } from './AddSongsDialog';
 import { useRouter } from 'next/navigation';
 
 export function HarmonyHubClient() {
-  const { songs, playlists, getPlaylistSongs, activePlaylistId, setActivePlaylistId } = useMusicPlayer();
+  const { getPlaylistSongs, activePlaylistId, setActivePlaylistId, isLoading } = useMusicPlayer();
   const [searchTerm, setSearchTerm] = useState("");
   const [isAddSongsDialogOpen, setIsAddSongsDialogOpen] = useState(false);
   const router = useRouter();
 
 
-  const activePlaylist = useMemo(() => playlists.find(p => p.id === activePlaylistId), [playlists, activePlaylistId]);
+  const activePlaylist = useMemo(() => {
+      const { playlists } = useMusicPlayer.getState();
+      return playlists.find(p => p.id === activePlaylistId)
+  }, [activePlaylistId]);
 
   const songsToDisplay = useMemo(() => {
     let currentSongs = getPlaylistSongs(activePlaylistId);
 
     if (searchTerm) {
-      const librarySongs = getPlaylistSongs('library');
-      return librarySongs.filter(song =>
+      const { songs } = useMusicPlayer.getState();
+      return songs.filter(song =>
         song.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
         song.artist.toLowerCase().includes(searchTerm.toLowerCase()) ||
         song.genre.toLowerCase().includes(searchTerm.toLowerCase())
@@ -70,7 +73,7 @@ export function HarmonyHubClient() {
             <AppHeader onSearchChange={handleSearchChange} onGoHome={() => handleSelectPlaylist('library')} />
             <UploadProgressBar />
             <div className="flex-shrink-0">
-                {playlistName && (
+                {playlistName && !isLoading && (
                     <div className="flex justify-between items-center px-4 pt-4 md:px-6 bg-transparent">
                     <h1 className="text-xl sm:text-2xl font-bold tracking-tight">
                         {playlistName}

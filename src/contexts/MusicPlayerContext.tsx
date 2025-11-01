@@ -45,6 +45,7 @@ interface MusicPlayerContextType {
   uploadTasks: UploadTask[];
   currentTrackIndex: number | null;
   isPlaying: boolean;
+  isLoading: boolean;
   currentTrack: Song | null;
   currentTime: number;
   duration: number;
@@ -89,7 +90,7 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
     () => (firestore ? query(collectionGroup(firestore, 'songs')) : null),
     [firestore]
   );
-  const { data: songsData } = useCollection<Song>(allSongsQuery);
+  const { data: songsData, isLoading: areSongsLoading } = useCollection<Song>(allSongsQuery);
 
   const playlistsRef = useMemoFirebase(
     () => (user ? collection(firestore, 'users', user.uid, 'playlists') : null),
@@ -582,6 +583,7 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
         uploadTasks,
         currentTrackIndex: currentTrackIndexInPlaylist,
         isPlaying,
+        isLoading: areSongsLoading,
         currentTrack,
         currentTime,
         duration,

@@ -99,7 +99,7 @@ const SongItemMenu = ({ song, onEdit, onDelete }: { song: Song, onEdit: (song: S
 
 
 export function SongList({ songs, playlistId }: SongListProps) {
-  const { playTrack, currentTrack, deleteSong } = useMusicPlayer();
+  const { playTrack, currentTrack, deleteSong, isLoading } = useMusicPlayer();
   const [songToEdit, setSongToEdit] = useState<Song | null>(null);
   const [songToDelete, setSongToDelete] = useState<Song | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -141,6 +141,16 @@ export function SongList({ songs, playlistId }: SongListProps) {
         setIsDeleting(false);
         setSongToDelete(null);
     }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground p-8">
+        <Loader2 className="w-16 h-16 mb-4 animate-spin"/>
+        <h2 className="text-xl font-semibold">Loading Songs...</h2>
+        <p className="mt-2">Please wait a moment.</p>
+      </div>
+    );
   }
 
   if (songs.length === 0) {
