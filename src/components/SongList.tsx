@@ -22,16 +22,20 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { AlbumArt } from './AlbumArt';
-import { Clock, MoreHorizontal, Music, Plus, Play, Pencil } from 'lucide-react';
+import { Clock, MoreHorizontal, Music, Plus, Play, Pencil, CheckCircle } from 'lucide-react';
 import { EditSongDialog } from './EditSongDialog';
 import { useUser } from '@/firebase';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Card, CardContent } from './ui/card';
 import { Button } from './ui/button';
+import { cn } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
 
 interface SongListProps {
   songs: Song[];
   playlistId: string;
+  isAddingMode?: boolean;
+  onAddSong?: (songId: string) => void;
 }
 
 function formatDuration(seconds: number) {
@@ -79,11 +83,33 @@ const SongItemMenu = ({ song, onEdit }: { song: Song, onEdit: (song: Song, e: Re
 };
 
 
-export function SongList({ songs, playlistId }: SongListProps) {
-  const { playTrack, currentTrack, setActivePlaylistId } = useMusicPlayer();
+export function SongList({ songs, playlistId, isAddingMode = false, onAddSong }: SongListProps) {
+  const { playTrack, currentTrack, setActivePlaylistId, getPlaylistSongs } = useMusicPlayer();
   const [songToEdit, setSongToEdit] = useState<Song | null>(null);
   const isMobile = useIsMobile();
   const [mobileLimit, setMobileLimit] = useState(15);
+  const { toast } = useToast();
+
+  const currentPlaylistSongs = getPlaylistSongs(playlistId);
+  const currentPlaylistSongIds = new Set(currentPlaylistSongs.map(s => s.id));
+
+  const handleRowClick = (song: Song, index: number) => {
+    if (isAddingMode && onAddSong) {
+      if(currentPlaylistSongIds.has(song.id)) {
+        toast({
+          description: `"${song.title}" is already in this playlist.`,
+        });
+      } else {
+        onAddSong(song.id);
+        toast({
+          description: `Added "${song.title}" to the playlist.`,
+        });
+      }
+    } else {
+      const playlistToShow = isAddingMode ? 'library' : playlistId;
+      playTrack(index, playlistToShow);
+    }
+  };
 
   const handleEdit = (song: Song, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -94,7 +120,7 @@ export function SongList({ songs, playlistId }: SongListProps) {
     setActivePlaylistId('library');
   };
 
-  if (songs.length === 0) {
+  if (songs.length === 0 && !isAddingMode) {
     if (playlistId === 'library') {
       return (
         <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground p-8">
@@ -109,7 +135,7 @@ export function SongList({ songs, playlistId }: SongListProps) {
         <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground p-8">
             <Music className="w-16 h-16 mb-4"/>
             <h2 className="text-xl font-semibold">This playlist is empty</h2>
-            <p className="mt-2 mb-4">Add songs from your library to this playlist.</p>
+            <p className="mt-2 mb-4">Click "Add Songs" to build your playlist.</p>
         </div>
     );
   }
@@ -123,19 +149,33 @@ export function SongList({ songs, playlistId }: SongListProps) {
         {songsToShow.map((song, index) => (
              <Card 
                 key={song.id} 
-                data-state={currentTrack?.id === song.id ? 'selected' : undefined}
+                data-state={currentTrack?.id === song.id && !isAddingMode ? 'selected' : undefined}
                 className="cursor-pointer transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted overflow-hidden group"
+                onClick={() => handleRowClick(song, index)}
             >
                 <CardContent className="p-0 flex flex-col relative">
-                    <div onClick={() => playTrack(index, playlistId)} className="relative aspect-square">
+                    <div className="relative aspect-square">
                         <AlbumArt src={song.albumArtUrl} alt={song.title} className="w-full h-full rounded-b-none" />
-                        <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Play className="w-8 h-8 text-white" fill="white"/>
+                        <div className={cn(
+                          "absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity",
+                          isAddingMode && 'group-hover:opacity-100'
+                        )}>
+                            {isAddingMode ? (
+                                currentPlaylistSongIds.has(song.id) ? (
+                                    <CheckCircle className="w-8 h-8 text-white" />
+                                ) : (
+                                    <Plus className="w-8 h-8 text-white" />
+                                )
+                            ) : (
+                                <Play className="w-8 h-8 text-white" fill="white"/>
+                            )}
                         </div>
                     </div>
-                    <div className="absolute top-0 right-0">
-                       <SongItemMenu song={song} onEdit={handleEdit} />
-                    </div>
+                    {!isAddingMode && (
+                      <div className="absolute top-0 right-0">
+                        <SongItemMenu song={song} onEdit={handleEdit} />
+                      </div>
+                    )}
                     <div className="p-2 min-w-0">
                         <p className="font-medium truncate text-sm">{song.title}</p>
                         <p className="text-xs text-muted-foreground truncate">{song.artist}</p>
@@ -173,14 +213,25 @@ export function SongList({ songs, playlistId }: SongListProps) {
             <TableRow 
                 key={song.id} 
                 className="group cursor-pointer"
-                data-state={currentTrack?.id === song.id ? 'selected' : undefined}
-                onClick={() => playTrack(index, playlistId)}
+                data-state={currentTrack?.id === song.id && !isAddingMode ? 'selected' : undefined}
+                onClick={() => handleRowClick(song, index)}
             >
               <TableCell className="px-2 md:px-4">
                 <div className="relative">
                   <AlbumArt src={song.albumArtUrl} alt={song.title} className="w-10 h-10" />
-                  <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Play className="w-5 h-5 text-white" fill="white"/>
+                  <div className={cn(
+                      "absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity",
+                      isAddingMode && "group-hover:opacity-100"
+                  )}>
+                      {isAddingMode ? (
+                          currentPlaylistSongIds.has(song.id) ? (
+                              <CheckCircle className="w-5 h-5 text-white" />
+                          ) : (
+                              <Plus className="w-5 h-5 text-white" />
+                          )
+                      ) : (
+                          <Play className="w-5 h-5 text-white" fill="white"/>
+                      )}
                   </div>
                 </div>
               </TableCell>
@@ -195,9 +246,11 @@ export function SongList({ songs, playlistId }: SongListProps) {
                 {formatDuration(song.duration)}
               </TableCell>
               <TableCell onClick={(e) => e.stopPropagation()} className="px-0 md:px-4 w-10 md:w-12">
-                  <div className="opacity-0 group-hover:opacity-100 focus-within:opacity-100">
-                    <SongItemMenu song={song} onEdit={handleEdit} />
-                  </div>
+                  {!isAddingMode && (
+                    <div className="opacity-0 group-hover:opacity-100 focus-within:opacity-100">
+                        <SongItemMenu song={song} onEdit={handleEdit} />
+                    </div>
+                  )}
               </TableCell>
             </TableRow>
           ))}
