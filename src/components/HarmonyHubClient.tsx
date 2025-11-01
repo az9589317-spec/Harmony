@@ -16,7 +16,7 @@ import { Plus } from 'lucide-react';
 import { AddSongsDialog } from './AddSongsDialog';
 
 export function HarmonyHubClient() {
-  const { songs, playlists, getPlaylistSongs, activePlaylistId, setActivePlaylistId, addSongToPlaylist } = useMusicPlayer();
+  const { songs, playlists, getPlaylistSongs, activePlaylistId, setActivePlaylistId } = useMusicPlayer();
   const [searchTerm, setSearchTerm] = useState("");
   const [isAddSongsDialogOpen, setIsAddSongsDialogOpen] = useState(false);
 
@@ -26,7 +26,6 @@ export function HarmonyHubClient() {
     let currentSongs = getPlaylistSongs(activePlaylistId);
 
     if (searchTerm) {
-      // When searching, search across all songs in the library
       const librarySongs = getPlaylistSongs('library');
       return librarySongs.filter(song =>
         song.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -50,34 +49,39 @@ export function HarmonyHubClient() {
     if (searchTerm) {
       return `Search Results`;
     }
+    if (activePlaylistId === 'library') {
+      return "All Songs";
+    }
     return activePlaylist?.name || 'Music';
-  }, [searchTerm, activePlaylist]);
+  }, [searchTerm, activePlaylist, activePlaylistId]);
 
   return (
     <SidebarProvider>
-      <div className="h-screen w-full flex flex-col bg-card overflow-hidden">
+      <div className="h-screen w-full flex flex-col bg-background overflow-hidden">
         <div className="flex flex-1 overflow-hidden">
           <Sidebar>
             <AppSidebar onSelectPlaylist={handleSelectPlaylist} />
           </Sidebar>
-          <SidebarInset className="relative flex flex-col overflow-hidden !m-0 !rounded-none !shadow-none">
-            <AppHeader />
+          <SidebarInset className="relative flex flex-col overflow-hidden !m-0 !rounded-none !shadow-none bg-transparent">
+            <AppHeader onSearchChange={handleSearchChange} />
             <UploadProgressBar />
-            <div className="flex justify-between items-center px-4 pt-6 md:px-6">
-              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
-                {playlistName}
-              </h1>
+            {playlistName && (
+                <div className="flex justify-between items-center px-4 pt-6 md:px-6">
+                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
+                    {playlistName}
+                </h1>
                 {activePlaylistId !== 'library' && !searchTerm && (
-                  <Button 
-                      variant="ghost"
-                      size="icon" 
-                      onClick={() => setIsAddSongsDialogOpen(true)}
-                  >
-                      <Plus className="h-6 w-6" />
-                      <span className="sr-only">Add Songs</span>
-                  </Button>
-              )}
-            </div>
+                    <Button 
+                        variant="ghost"
+                        size="icon" 
+                        onClick={() => setIsAddSongsDialogOpen(true)}
+                    >
+                        <Plus className="h-6 w-6" />
+                        <span className="sr-only">Add Songs</span>
+                    </Button>
+                )}
+                </div>
+            )}
             <ScrollArea className="flex-1">
               <SongList 
                 songs={songsToDisplay} 
