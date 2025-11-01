@@ -157,6 +157,7 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
     }
     
     let indices = Array.from(Array(songCount).keys());
+    const currentSong = currentTrackIndexInPlaylist !== null ? activePlaylistSongs[shuffledIndices[currentTrackIndexInPlaylist]] : null;
 
     if (isShuffled) {
       // Fisher-Yates shuffle
@@ -168,14 +169,11 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
     
     setShuffledIndices(indices);
 
-    // If a track is playing, find its new index in the shuffled/unshuffled list
-    if (currentTrackIndexInPlaylist !== null) {
-      const currentOriginalIndex = (shuffledIndices[currentTrackIndexInPlaylist] !== undefined) ? shuffledIndices[currentTrackIndexInPlaylist] : -1;
-      if(currentOriginalIndex !== -1) {
-        const newIndexInShuffledList = indices.indexOf(currentOriginalIndex);
-        if (newIndexInShuffledList !== -1) {
-          setCurrentTrackIndexInPlaylist(newIndexInShuffledList);
-        }
+    if (currentSong) {
+      const originalIndexOfCurrentSong = activePlaylistSongs.findIndex(s => s.id === currentSong.id);
+      const newShuffledIndex = indices.indexOf(originalIndexOfCurrentSong);
+      if(newShuffledIndex !== -1) {
+        setCurrentTrackIndexInPlaylist(newShuffledIndex);
       }
     }
   }, [isShuffled, activePlaylistId, songs, playlists]);
@@ -186,6 +184,39 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
       ? activePlaylistSongs[shuffledIndices[currentTrackIndexInPlaylist]]
       : null;
 
+  const playNext = useCallback(() => {
+    if (currentTrackIndexInPlaylist === null || shuffledIndices.length === 0) return;
+    const nextIndexInShuffledList = (currentTrackIndexInPlaylist + 1) % shuffledIndices.length;
+    const originalIndexToPlay = shuffledIndices[nextIndexInShuffledList];
+    playTrack(originalIndexToPlay, activePlaylistId);
+  }, [currentTrackIndexInPlaylist, shuffledIndices, activePlaylistId, playTrack]);
+
+  const playPrevious = () => {
+    if (currentTrackIndexInPlaylist === null || shuffledIndices.length === 0) return;
+    const prevIndexInShuffledList =
+      (currentTrackIndexInPlaylist - 1 + shuffledIndices.length) % shuffledIndices.length;
+    const originalIndexToPlay = shuffledIndices[prevIndexInShuffledList];
+    playTrack(originalIndexToPlay, activePlaylistId);
+  };
+  
+  const setupMediaSession = useCallback((track: Song) => {
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: track.title,
+        artist: track.artist,
+        album: 'Harmony Hub',
+        artwork: [
+          { src: track.albumArtUrl || '/icons/icon-192x192.png', sizes: '192x192', type: 'image/png' },
+          { src: track.albumArtUrl || '/icons/icon-512x512.png', sizes: '512x512', type: 'image/png' },
+        ]
+      });
+
+      navigator.mediaSession.setActionHandler('play', togglePlayPause);
+      navigator.mediaSession.setActionHandler('pause', togglePlayPause);
+      navigator.mediaSession.setActionHandler('previoustrack', playPrevious);
+      navigator.mediaSession.setActionHandler('nexttrack', playNext);
+    }
+  }, [playNext, playPrevious]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const playTrack = useCallback(
     (
@@ -211,19 +242,36 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
         setCurrentTrackIndexInPlaylist(shuffledIndexToPlay);
         audioRef.current
           .play()
-          .then(() => setIsPlaying(true))
+          .then(() => {
+              setIsPlaying(true);
+              setupMediaSession(track);
+          })
           .catch((e) => console.error('Playback failed', e));
       }
     },
-    [activePlaylistId, shuffledIndices, getPlaylistSongs]
+    [activePlaylistId, shuffledIndices, getPlaylistSongs, setupMediaSession]
   );
   
-   const playNext = useCallback(() => {
-    if (currentTrackIndexInPlaylist === null || shuffledIndices.length === 0) return;
-    const nextIndexInShuffledList = (currentTrackIndexInPlaylist + 1) % shuffledIndices.length;
-    const originalIndexToPlay = shuffledIndices[nextIndexInShuffledList];
-    playTrack(originalIndexToPlay, activePlaylistId);
-  }, [currentTrackIndexInPlaylist, shuffledIndices, activePlaylistId, playTrack]);
+  const togglePlayPause = () => {
+    if (!audioRef.current || !currentTrack) return;
+    if (isPlaying) {
+      audioRef.current.pause();
+      setIsPlaying(false);
+      if ('mediaSession' in navigator) {
+        navigator.mediaSession.playbackState = 'paused';
+      }
+    } else {
+      audioRef.current
+        .play()
+        .then(() => {
+          setIsPlaying(true);
+          if ('mediaSession' in navigator) {
+            navigator.mediaSession.playbackState = 'playing';
+          }
+        })
+        .catch((e) => console.error('Playback failed', e));
+    }
+  };
 
 
   const handleEnded = useCallback(() => {
@@ -445,27 +493,6 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
     handleUploadAndSave();
     
     return taskId;
-  };
-
-  const togglePlayPause = () => {
-    if (!audioRef.current || !currentTrack) return;
-    if (isPlaying) {
-      audioRef.current.pause();
-      setIsPlaying(false);
-    } else {
-      audioRef.current
-        .play()
-        .then(() => setIsPlaying(true))
-        .catch((e) => console.error('Playback failed', e));
-    }
-  };
-
-  const playPrevious = () => {
-    if (currentTrackIndexInPlaylist === null || shuffledIndices.length === 0) return;
-    const prevIndexInShuffledList =
-      (currentTrackIndexInPlaylist - 1 + shuffledIndices.length) % shuffledIndices.length;
-    const originalIndexToPlay = shuffledIndices[prevIndexInShuffledList];
-    playTrack(originalIndexToPlay, activePlaylistId);
   };
 
   const seek = (time: number) => {
