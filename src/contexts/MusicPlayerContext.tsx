@@ -65,6 +65,7 @@ interface MusicPlayerContextType {
   getActivePlaylistSongs: () => Song[];
   setActivePlaylistId: (playlistId: string) => void;
   updateSong: (songId: string, updatedData: Partial<Song>) => Promise<void>;
+  clearTask: (taskId: string) => void;
 }
 
 const MusicPlayerContext = createContext<MusicPlayerContextType | undefined>(
@@ -202,7 +203,11 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
   };
   
   const clearCompletedTasks = () => {
-    setUploadTasks([]);
+    setUploadTasks(prev => prev.filter(t => t.status === 'uploading' || t.status === 'processing'));
+  }
+  
+  const clearTask = (taskId: string) => {
+    setUploadTasks(prev => prev.filter(t => t.id !== taskId));
   }
 
   const getAudioDuration = (source: File | string): Promise<number> => {
@@ -499,6 +504,7 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
         getActivePlaylistSongs: () => activePlaylistSongs,
         setActivePlaylistId,
         updateSong,
+        clearTask,
       }}
     >
       {children}

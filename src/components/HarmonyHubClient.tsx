@@ -10,6 +10,7 @@ import { MusicPlayerControls } from '@/components/MusicPlayerControls';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { SidebarProvider, Sidebar, SidebarInset } from './ui/sidebar';
 import { ExpandedPlayerSheet } from './ExpandedPlayerSheet';
+import { UploadProgressBar } from './UploadProgressBar';
 
 export function HarmonyHubClient() {
   const { songs, playlists, getPlaylistSongs, activePlaylistId, setActivePlaylistId } = useMusicPlayer();
@@ -60,6 +61,7 @@ export function HarmonyHubClient() {
               playlistName={playlistName}
               onSearchChange={handleSearchChange}
             />
+            <UploadProgressBar />
             <ScrollArea className="flex-1">
               <SongList songs={songsToDisplay} playlistId={activePlaylistId} />
             </ScrollArea>
