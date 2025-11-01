@@ -3,7 +3,7 @@
 
 import { useMusicPlayer } from '@/contexts/MusicPlayerContext';
 import { Button } from './ui/button';
-import { ListMusic, Music, Plus, Headphones, Users } from 'lucide-react';
+import { ListMusic, Music, Plus, Headphones, Users, User as UserIcon } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -17,7 +17,7 @@ import { useState } from 'react';
 import { ScrollArea } from './ui/scroll-area';
 import { useSidebar } from './ui/sidebar';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { useUser } from '@/firebase';
 
@@ -32,6 +32,7 @@ export function AppSidebar({ onSelectPlaylist }: AppSidebarProps) {
   const [newPlaylistName, setNewPlaylistName] = useState('');
   const { setOpenMobile } = useSidebar();
   const pathname = usePathname();
+  const router = useRouter();
 
   const handleCreatePlaylist = () => {
     if (newPlaylistName.trim()) {
@@ -43,8 +44,16 @@ export function AppSidebar({ onSelectPlaylist }: AppSidebarProps) {
 
   const handleSelect = (playlistId: string) => {
     onSelectPlaylist(playlistId);
+    if(pathname !== '/') {
+        router.push('/');
+    }
     setOpenMobile(false); // Close sidebar on mobile after selection
   };
+  
+  const handleNav = (path: string) => {
+      setOpenMobile(false);
+      router.push(path);
+  }
 
   return (
     <div className="flex flex-col h-full p-2 md:p-4">
@@ -56,28 +65,36 @@ export function AppSidebar({ onSelectPlaylist }: AppSidebarProps) {
       </div>
 
       <nav className="flex flex-col gap-2 mb-4">
-        <Link href="/" passHref>
-          <Button
+        <Button
             variant={pathname === '/' ? 'secondary' : 'ghost'}
             className="justify-start gap-3 px-3 w-full"
-            onClick={() => setOpenMobile(false)}
-          >
+            onClick={() => handleNav('/')}
+        >
             <Music className="w-5 h-5" />
             <span className="group-data-[collapsible=icon]:hidden">Music</span>
-          </Button>
-        </Link>
-        <Link href="/community" passHref>
-          <Button
+        </Button>
+        <Button
             variant={pathname === '/community' ? 'secondary' : 'ghost'}
             className="justify-start gap-3 px-3 w-full"
-            onClick={() => setOpenMobile(false)}
-          >
+            onClick={() => handleNav('/community')}
+        >
             <Users className="w-5 h-5" />
             <span className="group-data-[collapsible=icon]:hidden">
               Community
             </span>
-          </Button>
-        </Link>
+        </Button>
+        {user && (
+            <Button
+                variant={pathname === '/profile' ? 'secondary' : 'ghost'}
+                className="justify-start gap-3 px-3 w-full"
+                onClick={() => handleNav('/profile')}
+            >
+                <UserIcon className="w-5 h-5" />
+                <span className="group-data-[collapsible=icon]:hidden">
+                My Profile
+                </span>
+            </Button>
+        )}
       </nav>
 
       {pathname === '/' && (

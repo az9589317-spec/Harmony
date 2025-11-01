@@ -1,0 +1,163 @@
+diff --git a/node_modules/jsmediatags/build2/ReactNativeFileReader.js b/node_modules/jsmediatags/build2/ReactNativeFileReader.js
+index e0d8824..3d79aeb 100644
+--- a/node_modules/jsmediatags/build2/ReactNativeFileReader.js
++++ b/node_modules/jsmediatags/build2/ReactNativeFileReader.js
+@@ -1,107 +1,73 @@
+-'use strict';
+-
+-function _typeof(obj) { if (typeof Symbol === "function" && typeof Symbol.iterator === "symbol") { _typeof = function _typeof(obj) { return typeof obj; }; } else { _typeof = function _typeof(obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; }; } return _typeof(obj); }
++"use strict";
+ 
++Object.defineProperty(exports, "__esModule", {
++  value: true
++});
++exports.default = void 0;
++function _typeof(o) { "@babel/helpers - typeof"; return _typeof = "function" == typeof Symbol && "symbol" == typeof Symbol.iterator ? function (o) { return typeof o; } : function (o) { return o && "function" == typeof Symbol && o.constructor === Symbol && o !== Symbol.prototype ? "symbol" : typeof o; }, _typeof(o); }
+ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+-
+-function _defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } }
+-
+-function _createClass(Constructor, protoProps, staticProps) { if (protoProps) _defineProperties(Constructor.prototype, protoProps); if (staticProps) _defineProperties(Constructor, staticProps); return Constructor; }
+-
+-function _possibleConstructorReturn(self, call) { if (call && (_typeof(call) === "object" || typeof call === "function")) { return call; } return _assertThisInitialized(self); }
+-
+-function _getPrototypeOf(o) { _getPrototypeOf = Object.setPrototypeOf ? Object.getPrototypeOf : function _getPrototypeOf(o) { return o.__proto__ || Object.getPrototypeOf(o); }; return _getPrototypeOf(o); }
+-
+-function _assertThisInitialized(self) { if (self === void 0) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return self; }
+-
+-function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function"); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, writable: true, configurable: true } }); if (superClass) _setPrototypeOf(subClass, superClass); }
+-
+-function _setPrototypeOf(o, p) { _setPrototypeOf = Object.setPrototypeOf || function _setPrototypeOf(o, p) { o.__proto__ = p; return o; }; return _setPrototypeOf(o, p); }
+-
+-function _defineProperty(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
+-
+-var RNFS = require('react-native-fs');
+-
++function _defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, _toPropertyKey(descriptor.key), descriptor); } }
++function _createClass(Constructor, protoProps, staticProps) { if (protoProps) _defineProperties(Constructor.prototype, protoProps); if (staticProps) _defineProperties(Constructor, staticProps); Object.defineProperty(Constructor, "prototype", { writable: false }); return Constructor; }
++function _toPropertyKey(t) { var i = _toPrimitive(t, "string"); return "symbol" == _typeof(i) ? i : i + ""; }
++function _toPrimitive(t, r) { if ("object" != _typeof(t) || !t) return t; var e = t[Symbol.toPrimitive]; if (void 0 !== e) { var i = e.call(t, r || "default"); if ("object" != _typeof(i)) return i; throw new TypeError("@@toPrimitive must return a primitive value."); } return ("string" === r ? String : Number)(t); }
++function _defineProperty(obj, key, value) { key = _toPropertyKey(key); if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
+ var _require = require('buffer'),
+-    Buffer = _require.Buffer;
+-
+-var ChunkedFileData = require('./ChunkedFileData');
+-
+-var MediaFileReader = require('./MediaFileReader');
+-
+-var ReactNativeFileReader =
+-/*#__PURE__*/
+-function (_MediaFileReader) {
+-  _inherits(ReactNativeFileReader, _MediaFileReader);
+-
++  Buffer = _require.Buffer;
++var ReactNativeFileReader = /*#__PURE__*/function () {
+   function ReactNativeFileReader(path) {
+-    var _this;
+-
+     _classCallCheck(this, ReactNativeFileReader);
+-
+-    _this = _possibleConstructorReturn(this, _getPrototypeOf(ReactNativeFileReader).call(this));
+-
+-    _defineProperty(_assertThisInitialized(_this), "_path", void 0);
+-
+-    _defineProperty(_assertThisInitialized(_this), "_fileData", void 0);
+-
+-    _this._path = path;
+-    _this._fileData = new ChunkedFileData();
+-    return _this;
++    _defineProperty(this, "_path", void 0);
++    _defineProperty(this, "_size", void 0);
++    this._path = path;
++    this._size = -1;
+   }
+-
+   _createClass(ReactNativeFileReader, [{
+-    key: "getByteAt",
+-    value: function getByteAt(offset) {
+-      return this._fileData.getByteAt(offset);
++    key: "getSize",
++    value: function getSize() {
++      return this._size;
+     }
+   }, {
+-    key: "_init",
+-    value: function _init(callbacks) {
+-      var self = this;
+-      RNFS.stat(self._path).then(function (statResult) {
+-        self._size = statResult.size;
++    key: "init",
++    value: function init(callbacks) {
++      var _this = this;
++      RNFS.stat(this._path).then(function (result) {
++        _this._size = result.size;
+         callbacks.onSuccess();
+-      })["catch"](function (error) {
++      }).catch(function (err) {
+         callbacks.onError({
+-          "type": "fs",
+-          "info": error
++          'type': 'fs',
++          'info': err.message
+         });
+       });
+     }
+   }, {
+     key: "loadRange",
+     value: function loadRange(range, callbacks) {
+-      var fd = -1;
+-      var self = this;
+-      var fileData = this._fileData;
++      var _this2 = this;
++      // RNFS.read(filepath, length, position, 'base64')
+       var length = range[1] - range[0] + 1;
+-      var onSuccess = callbacks.onSuccess;
+-
+-      var onError = callbacks.onError || function (object) {};
+-
+-      RNFS.read(this._path, length, range[0], {
+-        encoding: 'base64'
+-      }).then(function (readData) {
+-        var buffer = new Buffer(readData, 'base64');
+-        var data = Array.prototype.slice.call(buffer, 0, length);
+-        fileData.addData(range[0], data);
+-        onSuccess();
+-      })["catch"](function (err) {
+-        onError({
+-          "type": "fs",
+-          "info": err
++      RNFS.read(this._path, length, range[0], 'base64').then(function (result) {
++        var buffer = Buffer.from(result, 'base64');
++        callbacks.onSuccess(_this2.getArrayBuffer(buffer));
++      }).catch(function (err) {
++        callbacks.onError({
++          'type': 'fs',
++          'info': err.message
+         });
+       });
+     }
+-  }], [{
+-    key: "canReadFile",
+-    value: function canReadFile(file) {
+-      return typeof file === 'string' && !/^[a-z]+:\/\//i.test(file);
++  }, {
++    key: "getArrayBuffer",
++    value: function getArrayBuffer(buffer) {
++      var ab = new ArrayBuffer(buffer.length);
++      var view = new Uint8Array(ab);
++      for (var i = 0; i < buffer.length; ++i) {
++        view[i] = buffer[i];
++      }
++      return ab;
+     }
+   }]);
+-
+   return ReactNativeFileReader;
+-}(MediaFileReader);
+-
+-module.exports = ReactNativeFileReader;
+\ No newline at end of file
++}();
++var _default = exports.default = ReactNativeFileReader;
++//# sourceMappingURL=ReactNativeFileReader.js.map
+\ No newline at end of file

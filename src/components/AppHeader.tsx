@@ -3,7 +3,7 @@
 
 import React, { useState } from 'react';
 import { Input } from '@/components/ui/input';
-import { Search, LogOut, PanelLeft, Headphones } from 'lucide-react';
+import { Search, LogOut, PanelLeft, Headphones, User as UserIcon } from 'lucide-react';
 import { UploadDialog } from './UploadDialog';
 import { useUser, useAuth } from '@/firebase';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
@@ -124,6 +124,11 @@ export function AppHeader({ playlistName, onSearchChange }: AppHeaderProps) {
                   </p>
                 </div>
               </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+               <DropdownMenuItem onClick={() => router.push('/profile')}>
+                <UserIcon className="mr-2 h-4 w-4" />
+                <span>My Profile</span>
+              </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleLogout}>
                 <LogOut className="mr-2 h-4 w-4" />
