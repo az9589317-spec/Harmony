@@ -236,14 +236,23 @@ export default function CommunityPage() {
     if ((!postContent.trim() && !postImage) || !user || !firestore || !formRef.current) return;
     
     setIsSubmitting(true);
+
+    // Immediately clear the form for an optimistic UI
+    const contentToPost = postContent.trim();
+    const imageToPost = postImage;
+    
+    setPostContent('');
+    removeImage();
+    formRef.current?.reset();
     
     try {
         let imageUrl: string | undefined = undefined;
 
-        if (postImage) {
+        if (imageToPost) {
             const formData = new FormData();
-            formData.append('file', postImage);
+            formData.append('file', imageToPost);
             
+            // The upload happens in the background, we await it here before writing to DB.
             const result = await uploadMedia(formData, 'image');
             
             if (!result.success) {
@@ -256,7 +265,7 @@ export default function CommunityPage() {
           userId: user.uid,
           username: user.displayName || 'Anonymous',
           userImage: user.photoURL || null,
-          content: postContent.trim(),
+          content: contentToPost,
           createdAt: serverTimestamp(),
           likes: [],
           commentCount: 0,
@@ -265,29 +274,37 @@ export default function CommunityPage() {
 
         const postsCollection = collection(firestore, 'posts');
         
+        // No await here, let it run in the background. The listener will pick up the new post.
         addDoc(postsCollection, newPostData)
-          .then(() => {
-            setPostContent('');
-            removeImage();
-            setIsSubmitting(false);
-            formRef.current?.reset();
-          })
           .catch((serverError) => {
+            console.error("Failed to add post", serverError);
+            // Optionally, restore form state and show an error
+            setPostContent(contentToPost);
+            // We can't easily restore the file input, but we can show an error.
+            toast({
+                variant: 'destructive',
+                title: 'Failed to post',
+                description: 'Your post could not be saved. Please try again.',
+            });
             const permissionError = new FirestorePermissionError({
               path: postsCollection.path,
               operation: 'create',
               requestResourceData: newPostData,
             });
             errorEmitter.emit('permission-error', permissionError);
-            setIsSubmitting(false); // Make sure to stop submitting on error
           });
 
     } catch (error: any) {
+        // This will catch errors from uploadMedia
         toast({
             variant: 'destructive',
             title: 'Failed to post',
             description: error.message || 'An error occurred. Please try again.',
         });
+        // Restore content
+        setPostContent(contentToPost);
+    } finally {
+        // We set submitting to false immediately as the UI has already been updated.
         setIsSubmitting(false);
     }
   };
