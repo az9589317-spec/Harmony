@@ -79,6 +79,18 @@ const MusicPlayerContext = createContext<MusicPlayerContextType | undefined>(
   undefined
 );
 
+// Helper to convert Google Drive links
+const convertGoogleDriveUrl = (url: string): string => {
+    if (url.includes('drive.google.com')) {
+        const match = url.match(/file\/d\/([^/]+)/);
+        if (match && match[1]) {
+            const fileId = match[1];
+            return `https://drive.google.com/uc?export=download&id=${fileId}`;
+        }
+    }
+    return url;
+};
+
 export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
@@ -149,56 +161,6 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const activePlaylistSongs = useMemo(() => getPlaylistSongs(activePlaylistId), [activePlaylistId, getPlaylistSongs]);
   
-  useEffect(() => {
-    const songCount = activePlaylistSongs.length;
-    if (songCount === 0) {
-      setShuffledIndices([]);
-      return;
-    }
-    
-    let indices = Array.from(Array(songCount).keys());
-    const currentSong = currentTrackIndexInPlaylist !== null ? activePlaylistSongs[shuffledIndices[currentTrackIndexInPlaylist]] : null;
-
-    if (isShuffled) {
-      // Fisher-Yates shuffle
-      for (let i = indices.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [indices[i], indices[j]] = [indices[j], indices[i]];
-      }
-    }
-    
-    setShuffledIndices(indices);
-
-    if (currentSong) {
-      const originalIndexOfCurrentSong = activePlaylistSongs.findIndex(s => s.id === currentSong.id);
-      const newShuffledIndex = indices.indexOf(originalIndexOfCurrentSong);
-      if(newShuffledIndex !== -1) {
-        setCurrentTrackIndexInPlaylist(newShuffledIndex);
-      }
-    }
-  }, [isShuffled, activePlaylistId, songs, playlists]);
-
-
-  const currentTrack =
-    currentTrackIndexInPlaylist !== null && shuffledIndices[currentTrackIndexInPlaylist] !== undefined && activePlaylistSongs[shuffledIndices[currentTrackIndexInPlaylist]]
-      ? activePlaylistSongs[shuffledIndices[currentTrackIndexInPlaylist]]
-      : null;
-
-  const playNext = useCallback(() => {
-    if (currentTrackIndexInPlaylist === null || shuffledIndices.length === 0) return;
-    const nextIndexInShuffledList = (currentTrackIndexInPlaylist + 1) % shuffledIndices.length;
-    const originalIndexToPlay = shuffledIndices[nextIndexInShuffledList];
-    playTrack(originalIndexToPlay, activePlaylistId);
-  }, [currentTrackIndexInPlaylist, shuffledIndices, activePlaylistId, playTrack]);
-
-  const playPrevious = () => {
-    if (currentTrackIndexInPlaylist === null || shuffledIndices.length === 0) return;
-    const prevIndexInShuffledList =
-      (currentTrackIndexInPlaylist - 1 + shuffledIndices.length) % shuffledIndices.length;
-    const originalIndexToPlay = shuffledIndices[prevIndexInShuffledList];
-    playTrack(originalIndexToPlay, activePlaylistId);
-  };
-  
   const setupMediaSession = useCallback((track: Song) => {
     if ('mediaSession' in navigator) {
       navigator.mediaSession.metadata = new MediaMetadata({
@@ -211,14 +173,15 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
         ]
       });
 
-      navigator.mediaSession.setActionHandler('play', togglePlayPause);
-      navigator.mediaSession.setActionHandler('pause', togglePlayPause);
-      navigator.mediaSession.setActionHandler('previoustrack', playPrevious);
-      navigator.mediaSession.setActionHandler('nexttrack', playNext);
+      // These are defined later, so we wrap them in functions
+      navigator.mediaSession.setActionHandler('play', () => togglePlayPause());
+      navigator.mediaSession.setActionHandler('pause', () => togglePlayPause());
+      navigator.mediaSession.setActionHandler('previoustrack', () => playPrevious());
+      navigator.mediaSession.setActionHandler('nexttrack', () => playNext());
     }
-  }, [playNext, playPrevious]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const playTrack = useCallback(
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  
+   const playTrack = useCallback(
     (
       indexInOriginalPlaylist: number,
       playlistId: string = activePlaylistId
@@ -235,7 +198,7 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
           setActivePlaylistId(playlistId);
         }
         if (track.fileUrl) {
-          audioRef.current.src = track.fileUrl;
+          audioRef.current.src = convertGoogleDriveUrl(track.fileUrl);
           audioRef.current.crossOrigin = 'anonymous';
         }
         // Set the index of the *shuffled* list
@@ -252,6 +215,99 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
     [activePlaylistId, shuffledIndices, getPlaylistSongs, setupMediaSession]
   );
   
+  // Define playNext and playPrevious before they are used in `handleEnded`
+  const playNext = useCallback(() => {
+    if (currentTrackIndexInPlaylist === null || shuffledIndices.length === 0) return;
+    const nextIndexInShuffledList = (currentTrackIndexInPlaylist + 1);
+    
+    // Check for end of playlist based on repeat mode
+    if (nextIndexInShuffledList >= shuffledIndices.length) {
+      if (repeatMode === 'all') {
+        const nextOriginalIndex = shuffledIndices[0];
+        playTrack(nextOriginalIndex, activePlaylistId);
+      } else {
+        // Stop playing or do nothing if not repeating
+        setIsPlaying(false);
+      }
+    } else {
+      const nextOriginalIndex = shuffledIndices[nextIndexInShuffledList];
+      playTrack(nextOriginalIndex, activePlaylistId);
+    }
+  }, [currentTrackIndexInPlaylist, shuffledIndices, activePlaylistId, playTrack, repeatMode]);
+
+  const playPrevious = () => {
+    if (currentTrackIndexInPlaylist === null || shuffledIndices.length === 0) return;
+    const prevIndexInShuffledList =
+      (currentTrackIndexInPlaylist - 1 + shuffledIndices.length) % shuffledIndices.length;
+    const originalIndexToPlay = shuffledIndices[prevIndexInShuffledList];
+    playTrack(originalIndexToPlay, activePlaylistId);
+  };
+
+  const handleEnded = useCallback(() => {
+    if (repeatMode === 'one' && currentTrackIndexInPlaylist !== null) {
+      const originalIndexToPlay = shuffledIndices[currentTrackIndexInPlaylist];
+      playTrack(originalIndexToPlay, activePlaylistId);
+    } else {
+      playNext();
+    }
+  }, [repeatMode, playNext, playTrack, currentTrackIndexInPlaylist, activePlaylistId, shuffledIndices]);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    const handleTimeUpdate = () => setCurrentTime(audio.currentTime);
+    const handleLoadedMetadata = () => setDuration(audio.duration);
+
+    audio.addEventListener('timeupdate', handleTimeUpdate);
+    audio.addEventListener('loadedmetadata', handleLoadedMetadata);
+    audio.addEventListener('ended', handleEnded);
+
+    return () => {
+      audio.removeEventListener('timeupdate', handleTimeUpdate);
+      audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
+      audio.removeEventListener('ended', handleEnded);
+    };
+  }, [handleEnded]);
+
+  useEffect(() => {
+    const songCount = activePlaylistSongs.length;
+    if (songCount === 0) {
+      setShuffledIndices([]);
+      return;
+    }
+    
+    let indices = Array.from(Array(songCount).keys());
+    const currentSongBeforeShuffle = currentTrackIndexInPlaylist !== null && shuffledIndices[currentTrackIndexInPlaylist] < activePlaylistSongs.length ? activePlaylistSongs[shuffledIndices[currentTrackIndexInPlaylist]] : null;
+
+    if (isShuffled) {
+      // Fisher-Yates shuffle
+      for (let i = indices.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [indices[i], indices[j]] = [indices[j], indices[i]];
+      }
+    }
+
+    if (currentSongBeforeShuffle) {
+        const originalIndex = activePlaylistSongs.findIndex(s => s.id === currentSongBeforeShuffle.id);
+        const newShuffledIndex = indices.indexOf(originalIndex);
+        if (newShuffledIndex !== -1) {
+            setShuffledIndices(indices);
+            setCurrentTrackIndexInPlaylist(newShuffledIndex);
+        } else {
+            setShuffledIndices(indices);
+        }
+    } else {
+        setShuffledIndices(indices);
+    }
+  }, [isShuffled, activePlaylistId, playlists, activePlaylistSongs]); // Reworked dependencies
+
+
+  const currentTrack =
+    currentTrackIndexInPlaylist !== null && shuffledIndices.length > 0 && activePlaylistSongs.length > 0 && shuffledIndices[currentTrackIndexInPlaylist] < activePlaylistSongs.length
+      ? activePlaylistSongs[shuffledIndices[currentTrackIndexInPlaylist]]
+      : null;
+
   const togglePlayPause = () => {
     if (!audioRef.current || !currentTrack) return;
     if (isPlaying) {
@@ -272,39 +328,6 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
         .catch((e) => console.error('Playback failed', e));
     }
   };
-
-
-  const handleEnded = useCallback(() => {
-    if (repeatMode === 'one' && currentTrackIndexInPlaylist !== null) {
-      const originalIndexToPlay = shuffledIndices[currentTrackIndexInPlaylist];
-      playTrack(originalIndexToPlay, activePlaylistId);
-    } else if (repeatMode === 'all' || (repeatMode === 'none' && currentTrackIndexInPlaylist !== shuffledIndices.length -1) ) {
-      playNext();
-    } else {
-      // If repeat is 'none' and it's the last song, stop playback.
-      setIsPlaying(false);
-      if(audioRef.current) audioRef.current.currentTime = 0;
-    }
-  }, [repeatMode, playNext, playTrack, currentTrackIndexInPlaylist, activePlaylistId, shuffledIndices]);
-
-
-  useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
-
-    const handleTimeUpdate = () => setCurrentTime(audio.currentTime);
-    const handleLoadedMetadata = () => setDuration(audio.duration);
-
-    audio.addEventListener('timeupdate', handleTimeUpdate);
-    audio.addEventListener('loadedmetadata', handleLoadedMetadata);
-    audio.addEventListener('ended', handleEnded);
-
-    return () => {
-      audio.removeEventListener('timeupdate', handleTimeUpdate);
-      audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
-      audio.removeEventListener('ended', handleEnded);
-    };
-  }, [handleEnded]);
 
   const updateTaskProgress = (
     taskId: string,
@@ -328,7 +351,7 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
   const getAudioDuration = (source: File | string): Promise<number> => {
     return new Promise((resolve) => {
       const audio = document.createElement('audio');
-      audio.src = typeof source === 'string' ? source : URL.createObjectURL(source);
+      audio.src = typeof source === 'string' ? convertGoogleDriveUrl(source) : URL.createObjectURL(source);
       audio.crossOrigin = 'anonymous'; // Important for CORS
       
       const cleanup = () => {
@@ -353,7 +376,7 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
     return new Promise<string>(async (resolve, reject) => {
       if (typeof source === 'string') {
         try {
-           const response = await fetch(source);
+           const response = await fetch(convertGoogleDriveUrl(source));
            const blob = await response.blob();
            const reader = new FileReader();
            reader.onload = () => resolve(reader.result as string);
@@ -412,7 +435,7 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
             }
             downloadURL = result.url;
         } else {
-            downloadURL = source as string;
+            downloadURL = convertGoogleDriveUrl(source as string);
         }
         
         updateTaskProgress(taskId, { progress: 100, status: 'processing' });
@@ -653,3 +676,5 @@ export const useMusicPlayer = () => {
   }
   return context;
 };
+
+    
