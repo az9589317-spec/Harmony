@@ -11,10 +11,11 @@
  * - /users/{userId}/songs/{songId}: Stores songs uploaded by each user.
  * - /users/{userId}/playlists/{playlistId}: Stores playlists created by each user.
  * - /posts/{postId}: Stores all posts for the community feed.
+ * - /posts/{postId}/comments/{commentId}: Stores comments for each post.
  *
  * Key Security Decisions:
- * - Users can only create, update, or delete their own data (playlists, posts, songs).
- * - Anyone can read posts in the community feed.
+ * - Users can only create, update, or delete their own data (playlists, posts, songs, comments).
+ * - Anyone can read posts and comments in the community feed.
  * - Anyone can read any song from any user.
  * - User listing is disallowed for privacy.
  * - All write operations require authentication.
@@ -120,7 +121,27 @@ service cloud.firestore {
                       && incomingData().content is string
                       && (!('imageUrl' in incomingData()) || (incomingData().imageUrl is string));
 
-      allow update, delete: if isSignedIn() && isPostOwner();
+      // Allow liking/unliking and comment count updates
+      allow update: if isSignedIn() && (
+                      // Owner can edit content
+                      (isPostOwner() && request.resource.data.userId == resource.data.userId) ||
+                      // Any signed in user can like/unlike
+                      (request.resource.data.keys().hasOnly(['likes'])) ||
+                      // Updating comment count in transaction
+                       (request.resource.data.keys().hasOnly(['commentCount']))
+                    );
+
+      allow delete: if isSignedIn() && isPostOwner();
+
+       /**
+       * @description Manages comments for each post.
+       * @path /posts/{postId}/comments/{commentId}
+       */
+      match /comments/{commentId} {
+        allow list, get: if true; // Anyone can read comments
+        allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid; // Only signed in users can comment
+        allow update, delete: if isSignedIn() && request.auth.uid == resource.data.userId; // Only the comment owner can edit/delete
+      }
     }
   }
 }

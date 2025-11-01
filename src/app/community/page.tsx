@@ -2,14 +2,14 @@
 
 import { useUser, useFirestore, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState, useRef } from 'react';
-import { collection, addDoc, serverTimestamp, Timestamp, deleteDoc, doc } from 'firebase/firestore';
-import { Loader2, Paperclip, X, MoreHorizontal, Trash2 } from 'lucide-react';
+import { useEffect, useState, useRef, useMemo } from 'react';
+import { collection, addDoc, serverTimestamp, Timestamp, deleteDoc, doc, updateDoc, arrayUnion, arrayRemove, runTransaction } from 'firebase/firestore';
+import { Loader2, Paperclip, X, MoreHorizontal, Trash2, Heart, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import type { Post } from '@/lib/types';
 import { formatDistanceToNow } from 'date-fns';
@@ -37,6 +37,8 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { CommentSection } from '@/components/CommentSection';
+import { cn } from '@/lib/utils';
 
 
 function PostCard({ post }: { post: Post }) {
@@ -45,6 +47,7 @@ function PostCard({ post }: { post: Post }) {
     const { toast } = useToast();
     const [isDeleting, setIsDeleting] = useState(false);
     const [isAlertOpen, setIsAlertOpen] = useState(false);
+    const [isCommenting, setIsCommenting] = useState(false);
 
     const getInitials = (name?: string | null) => {
         if (!name) return 'U';
@@ -54,6 +57,28 @@ function PostCard({ post }: { post: Post }) {
     const timeAgo = post.createdAt && (post.createdAt as Timestamp).toDate ? 
         formatDistanceToNow((post.createdAt as Timestamp).toDate(), { addSuffix: true }) : 
         'just now';
+
+    const hasLiked = useMemo(() => user && post.likes.includes(user.uid), [post.likes, user]);
+
+    const handleLike = async () => {
+        if (!user || !firestore) {
+            toast({ variant: 'destructive', title: 'You must be logged in to like a post.' });
+            return;
+        }
+        const postRef = doc(firestore, 'posts', post.id);
+
+        const operation = hasLiked ? arrayRemove : arrayUnion;
+        updateDoc(postRef, {
+            likes: operation(user.uid)
+        }).catch(serverError => {
+             const permissionError = new FirestorePermissionError({
+                path: postRef.path,
+                operation: 'update',
+                requestResourceData: { likes: operation(user.uid) },
+            });
+            errorEmitter.emit('permission-error', permissionError);
+        });
+    }
 
     const handleDelete = async () => {
         if (!user || user.uid !== post.userId || !firestore) return;
@@ -122,6 +147,19 @@ function PostCard({ post }: { post: Post }) {
           )}
         </div>
       </CardContent>
+      <CardFooter className="px-4 pb-3">
+        <div className="flex items-center gap-4 text-muted-foreground">
+            <Button variant="ghost" size="sm" className="flex items-center gap-1.5" onClick={handleLike}>
+                <Heart className={cn("h-4 w-4", hasLiked && "fill-red-500 text-red-500")} />
+                <span className="text-sm">{post.likes.length}</span>
+            </Button>
+            <Button variant="ghost" size="sm" className="flex items-center gap-1.5" onClick={() => setIsCommenting(!isCommenting)}>
+                <MessageSquare className="h-4 w-4" />
+                <span className="text-sm">{post.commentCount || 0}</span>
+            </Button>
+        </div>
+      </CardFooter>
+      {isCommenting && <CommentSection postId={post.id} />}
     </Card>
     <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
         <AlertDialogContent>
@@ -218,6 +256,8 @@ export default function CommunityPage() {
           userImage: user.photoURL || null,
           content: postContent.trim(),
           createdAt: serverTimestamp(),
+          likes: [],
+          commentCount: 0,
           ...(imageUrl && { imageUrl }),
         };
 

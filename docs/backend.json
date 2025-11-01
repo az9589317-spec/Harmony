@@ -154,14 +154,63 @@
           "type": "string",
           "description": "URL of an optional image attached to the post.",
           "format": "uri"
+        },
+        "likes": {
+            "type": "array",
+            "description": "A list of user IDs that have liked the post.",
+            "items": {
+                "type": "string"
+            }
+        },
+        "commentCount": {
+            "type": "number",
+            "description": "The number of comments on the post."
         }
       },
       "required": [
         "id",
         "userId",
         "content",
-        "createdAt"
+        "createdAt",
+        "likes",
+        "commentCount"
       ]
+    },
+    "Comment": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "title": "Comment",
+        "type": "object",
+        "description": "Represents a comment on a post.",
+        "properties": {
+            "id": {
+                "type": "string",
+                "description": "Unique identifier for the Comment entity."
+            },
+            "postId": {
+                "type": "string",
+                "description": "Reference to the Post this comment belongs to."
+            },
+            "userId": {
+                "type": "string",
+                "description": "Reference to the User who created the comment."
+            },
+            "content": {
+                "type": "string",
+                "description": "The text content of the comment."
+            },
+            "createdAt": {
+                "type": "string",
+                "description": "Timestamp indicating when the comment was created.",
+                "format": "date-time"
+            }
+        },
+        "required": [
+            "id",
+            "postId",
+            "userId",
+            "content",
+            "createdAt"
+        ]
     }
   },
   "auth": {
@@ -243,8 +292,28 @@
             }
           ]
         }
+      },
+       {
+        "path": "/posts/{postId}/comments/{commentId}",
+        "definition": {
+          "entityName": "Comment",
+          "schema": {
+            "$ref": "#/backend/entities/Comment"
+          },
+          "description": "Stores comments for a specific post.",
+          "params": [
+            {
+              "name": "postId",
+              "description": "The unique identifier of the post."
+            },
+            {
+                "name": "commentId",
+                "description": "The unique identifier of the comment."
+            }
+          ]
+        }
       }
     ],
-    "reasoning": "The Firestore data structure is designed to support the Harmony Hub application, focusing on user authentication, song uploads, and playlist management. It prioritizes security, scalability, and debuggability by adhering to the principles of Authorization Independence, Structural Segregation, and Access Modeling. Path-based ownership is used for private user data, while a root collection for posts allows for a global community feed. Explicit state modeling (if applicable in the future) and predictable schema patterns enhance debuggability.\n\nAuthorization Independence is achieved primarily through path-based ownership for songs. Each user has their own collection of songs under `/users/{userId}/songs/{songId}`. Security rules can then directly check `request.auth.uid == userId` without needing to `get()` parent documents. This enables atomic operations and simplifies security rules.\n\nStructural Segregation is applied by storing each user's songs in a dedicated subcollection under their user document (`/users/{userId}/songs`). This ensures that security rules for song access are consistent within the collection. User data is stored at `/users/{userId}`. Posts are stored in a root collection `/posts` to allow all users to read them for a community feed, while write access is restricted to the post owner."
+    "reasoning": "The Firestore data structure is designed to support the Harmony Hub application, focusing on user authentication, song uploads, and playlist management. It prioritizes security, scalability, and debuggability by adhering to the principles of Authorization Independence, Structural Segregation, and Access Modeling. Path-based ownership is used for private user data, while a root collection for posts allows for a global community feed. Explicit state modeling (if applicable in the future) and predictable schema patterns enhance debuggability.\n\nAuthorization Independence is achieved primarily through path-based ownership for songs. Each user has their own collection of songs under `/users/{userId}/songs/{songId}`. Security rules can then directly check `request.auth.uid == userId` without needing to `get()` parent documents. This enables atomic operations and simplifies security rules.\n\nStructural Segregation is applied by storing each user's songs in a dedicated subcollection under their user document (`/users/{userId}/songs`). This ensures that security rules for song access are consistent within the collection. User data is stored at `/users/{userId}`. Posts are stored in a root collection `/posts` to allow all users to read them for a community feed, while write access is restricted to the post owner. Comments are a subcollection of posts to keep them organized and allow for efficient querying."
   }
 }

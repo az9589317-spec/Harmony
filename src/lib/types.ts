@@ -35,4 +35,16 @@ export interface Post {
   content: string;
   createdAt: Timestamp | FieldValue; // Firestore Timestamp on read, FieldValue on write
   imageUrl?: string; // Optional image URL
+  likes: string[]; // Array of user IDs who liked the post
+  commentCount: number;
+}
+
+export interface Comment {
+    id: string;
+    postId: string;
+    userId: string;
+    username: string;
+    userImage: string | null;
+    content: string;
+    createdAt: Timestamp | FieldValue;
 }
