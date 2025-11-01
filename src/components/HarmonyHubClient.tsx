@@ -16,7 +16,7 @@ import { Plus } from 'lucide-react';
 import { AddSongsDialog } from './AddSongsDialog';
 
 export function HarmonyHubClient() {
-  const { songs, playlists, getPlaylistSongs, activePlaylistId, setActivePlaylistId } = useMusicPlayer();
+  const { songs, playlists, getPlaylistSongs, activePlaylistId, setActivePlaylistId, addSongToPlaylist } = useMusicPlayer();
   const [searchTerm, setSearchTerm] = useState("");
   const [isAddSongsDialogOpen, setIsAddSongsDialogOpen] = useState(false);
 
@@ -60,26 +60,28 @@ export function HarmonyHubClient() {
           <Sidebar>
             <AppSidebar onSelectPlaylist={handleSelectPlaylist} />
           </Sidebar>
-          <SidebarInset className="flex flex-col overflow-hidden !m-0 !rounded-none !shadow-none">
+          <SidebarInset className="relative flex flex-col overflow-hidden !m-0 !rounded-none !shadow-none">
             <AppHeader 
               playlistName={playlistName}
               onSearchChange={handleSearchChange}
             />
             <UploadProgressBar />
             <ScrollArea className="flex-1">
-              {activePlaylistId !== 'library' && !searchTerm && (
-                <div className="p-4 md:p-6 pb-0">
-                    <Button onClick={() => setIsAddSongsDialogOpen(true)}>
-                        <Plus className="mr-2 h-4 w-4" />
-                        Add Songs
-                    </Button>
-                </div>
-              )}
               <SongList 
                 songs={songsToDisplay} 
                 playlistId={activePlaylistId} 
               />
             </ScrollArea>
+             {activePlaylistId !== 'library' && !searchTerm && (
+                <Button 
+                    size="icon" 
+                    className="absolute bottom-6 right-6 h-14 w-14 rounded-full shadow-lg"
+                    onClick={() => setIsAddSongsDialogOpen(true)}
+                >
+                    <Plus className="h-6 w-6" />
+                    <span className="sr-only">Add Songs</span>
+                </Button>
+            )}
           </SidebarInset>
         </div>
         <MusicPlayerControls />
