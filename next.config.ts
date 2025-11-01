@@ -49,13 +49,6 @@ const nextConfig: NextConfig = {
       bodySizeLimit: '100mb',
     },
   },
-  webpack: (config, { isServer }) => {
-    config.resolve.fallback = {
-      ...config.resolve.fallback,
-      'react-native-fs': false,
-    };
-    return config;
-  },
 };
 
 export default withPWA(nextConfig);
