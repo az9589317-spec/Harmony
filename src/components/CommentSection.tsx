@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import { useToast } from '@/hooks/use-toast';
 
 interface CommentSectionProps {
     postId: string;
@@ -46,6 +47,7 @@ function CommentCard({ comment }: { comment: Comment }) {
 export function CommentSection({ postId }: CommentSectionProps) {
     const { user } = useUser();
     const firestore = useFirestore();
+    const { toast } = useToast();
     const [commentContent, setCommentContent] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -60,6 +62,10 @@ export function CommentSection({ postId }: CommentSectionProps) {
         if (!commentContent.trim() || !user || !firestore) return;
 
         setIsSubmitting(true);
+        
+        // Optimistic UI: clear input immediately
+        const contentToSubmit = commentContent.trim();
+        setCommentContent('');
 
         const postRef = doc(firestore, 'posts', postId);
         const commentsCollection = collection(firestore, `posts/${postId}/comments`);
@@ -69,33 +75,36 @@ export function CommentSection({ postId }: CommentSectionProps) {
             userId: user.uid,
             username: user.displayName || 'Anonymous',
             userImage: user.photoURL || null,
-            content: commentContent.trim(),
+            content: contentToSubmit,
             createdAt: serverTimestamp(),
         };
 
-        try {
-            await runTransaction(firestore, async (transaction) => {
-                const postDoc = await transaction.get(postRef);
-                if (!postDoc.exists()) {
-                    throw "Post does not exist!";
-                }
+        // Run transaction in the background
+        runTransaction(firestore, async (transaction) => {
+            const postDoc = await transaction.get(postRef);
+            if (!postDoc.exists()) {
+                throw "Post does not exist!";
+            }
 
-                const newCommentCount = (postDoc.data().commentCount || 0) + 1;
-                transaction.update(postRef, { commentCount: newCommentCount });
-                
-                const newCommentRef = doc(commentsCollection);
-                transaction.set(newCommentRef, newCommentData);
-            });
+            const newCommentCount = (postDoc.data().commentCount || 0) + 1;
+            transaction.update(postRef, { commentCount: newCommentCount });
             
-            setCommentContent('');
-
-        } catch(error) {
+            const newCommentRef = doc(commentsCollection);
+            transaction.set(newCommentRef, newCommentData);
+        }).catch(error => {
             console.error("Comment transaction failed: ", error);
+            // Restore input and show error if something went wrong
+            setCommentContent(contentToSubmit);
+            toast({
+                variant: 'destructive',
+                title: 'Failed to reply',
+                description: 'Your comment could not be saved. Please try again.',
+            });
             // The reads/writes that failed will be caught by useCollection/individual write handlers
-            // to create contextual errors, so we don't need to create a toast here.
-        } finally {
+            // to create contextual errors, so we don't need to manually emit here.
+        }).finally(() => {
             setIsSubmitting(false);
-        }
+        });
     };
 
     return (
