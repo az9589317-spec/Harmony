@@ -54,14 +54,20 @@ const nextConfig: NextConfig = {
       bodySizeLimit: '100mb',
     },
   },
-  webpack: (config) => {
-    // This is to prevent an error with jsmediatags during production builds
+};
+
+const finalConfig = withPWA(nextConfig);
+
+// Only add the webpack config if running in production to avoid Turbopack conflicts
+if (isProduction) {
+  finalConfig.webpack = (config) => {
     config.resolve.fallback = {
       ...config.resolve.fallback,
       'react-native-fs': false,
     };
     return config;
-  }
-};
+  };
+}
 
-export default withPWA(nextConfig);
+
+export default finalConfig;
