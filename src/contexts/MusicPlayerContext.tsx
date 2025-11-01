@@ -109,6 +109,7 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
     const libraryPlaylist: Playlist = {
       id: 'library',
       name: 'My Library',
+      userId: user?.uid || 'anonymous',
       songIds: songs.map((s) => s.id),
       createdAt: serverTimestamp()
     };
@@ -425,7 +426,7 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
       'playlists',
       newPlaylistId
     );
-    const newPlaylist: Playlist = { id: newPlaylistId, name, songIds: [], createdAt: serverTimestamp() };
+    const newPlaylist: Playlist = { id: newPlaylistId, name, userId: user.uid, songIds: [], createdAt: serverTimestamp() };
     setDoc(playlistRef, newPlaylist).catch(serverError => {
         const permissionError = new FirestorePermissionError({
             path: playlistRef.path,

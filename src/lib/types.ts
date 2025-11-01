@@ -15,6 +15,7 @@ export interface Song {
 export interface Playlist {
   id: string;
   name: string;
+  userId: string;
   songIds: string[];
   createdAt: FieldValue;
 }
