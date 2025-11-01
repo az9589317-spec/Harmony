@@ -19,8 +19,13 @@ import {
   SkipForward,
   Volume2,
   VolumeX,
+  Shuffle,
+  Repeat,
+  Repeat1,
 } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { cn } from '@/lib/utils';
+
 
 function formatDuration(seconds: number) {
   if (isNaN(seconds) || seconds < 0) return '0:00';
@@ -43,6 +48,10 @@ export function ExpandedPlayerSheet() {
     seek,
     volume,
     setVolume,
+    isShuffled,
+    toggleShuffle,
+    repeatMode,
+    toggleRepeatMode,
   } = useMusicPlayer();
   const isMobile = useIsMobile();
 
@@ -60,6 +69,9 @@ export function ExpandedPlayerSheet() {
     // to prevent the sheet from opening with no content.
     return null;
   }
+
+  const RepeatIcon = repeatMode === 'one' ? Repeat1 : Repeat;
+
 
   return (
     <Sheet open={isPlayerSheetOpen} onOpenChange={togglePlayerSheet}>
@@ -102,6 +114,9 @@ export function ExpandedPlayerSheet() {
                 </div>
 
                 <div className="flex items-center justify-center gap-4">
+                     <Button variant="ghost" size="icon" onClick={toggleShuffle} className={cn("h-14 w-14 hover:bg-white/20", isShuffled && "text-accent-foreground bg-white/20")}>
+                        <Shuffle className="h-6 w-6" />
+                    </Button>
                     <Button variant="ghost" size="icon" onClick={playPrevious} className="h-14 w-14 hover:bg-white/20">
                         <SkipBack className="h-8 w-8" />
                     </Button>
@@ -114,6 +129,9 @@ export function ExpandedPlayerSheet() {
                     </Button>
                     <Button variant="ghost" size="icon" onClick={playNext} className="h-14 w-14 hover:bg-white/20">
                         <SkipForward className="h-8 w-8" />
+                    </Button>
+                    <Button variant="ghost" size="icon" onClick={toggleRepeatMode} className={cn("h-14 w-14 hover:bg-white/20", repeatMode !== 'none' && "text-accent-foreground bg-white/20")}>
+                        <RepeatIcon className="h-6 w-6" />
                     </Button>
                 </div>
                 

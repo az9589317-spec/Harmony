@@ -1,3 +1,4 @@
+
 import { FieldValue, Timestamp } from "firebase/firestore";
 
 export interface Song {
@@ -49,3 +50,5 @@ export interface Comment {
     content: string;
     createdAt: Timestamp | FieldValue;
 }
+
+export type RepeatMode = 'none' | 'one' | 'all';

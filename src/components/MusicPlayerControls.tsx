@@ -4,8 +4,10 @@
 import { useMusicPlayer } from '@/contexts/MusicPlayerContext';
 import { Button } from './ui/button';
 import { Slider } from './ui/slider';
-import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Music } from 'lucide-react';
+import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Music, Shuffle, Repeat, Repeat1 } from 'lucide-react';
 import { AlbumArt } from './AlbumArt';
+import { cn } from '@/lib/utils';
+
 
 function formatDuration(seconds: number) {
     if (isNaN(seconds) || seconds < 0) return '0:00';
@@ -27,6 +29,10 @@ export function MusicPlayerControls() {
     volume,
     setVolume,
     togglePlayerSheet,
+    isShuffled,
+    toggleShuffle,
+    repeatMode,
+    toggleRepeatMode,
   } = useMusicPlayer();
 
   const handleSeek = (value: number[]) => {
@@ -36,6 +42,8 @@ export function MusicPlayerControls() {
   const handleVolumeChange = (value: number[]) => {
     setVolume(value[0]);
   }
+
+  const RepeatIcon = repeatMode === 'one' ? Repeat1 : Repeat;
 
   return (
     <footer className="h-20 bg-card border-t shrink-0 p-2 sm:p-4 flex items-center justify-between gap-4 z-10 shadow-inner">
@@ -66,6 +74,9 @@ export function MusicPlayerControls() {
 
       <div className="flex-1 flex flex-col items-center justify-center gap-2">
         <div className="flex items-center gap-2">
+           <Button variant="ghost" size="icon" onClick={toggleShuffle} disabled={!currentTrack} className={cn("w-10 h-10 rounded-full hidden sm:inline-flex", isShuffled && "text-accent")}>
+            <Shuffle className="h-5 w-5" />
+          </Button>
           <Button variant="ghost" size="icon" onClick={playPrevious} disabled={!currentTrack} className="w-10 h-10 rounded-full">
             <SkipBack className="h-5 w-5" />
           </Button>
@@ -74,6 +85,9 @@ export function MusicPlayerControls() {
           </Button>
           <Button variant="ghost" size="icon" onClick={playNext} disabled={!currentTrack} className="w-10 h-10 rounded-full">
             <SkipForward className="h-5 w-5" />
+          </Button>
+           <Button variant="ghost" size="icon" onClick={toggleRepeatMode} disabled={!currentTrack} className={cn("w-10 h-10 rounded-full hidden sm:inline-flex", repeatMode !== 'none' && "text-accent")}>
+            <RepeatIcon className="h-5 w-5" />
           </Button>
         </div>
         <div className="w-full hidden sm:flex items-center gap-2">

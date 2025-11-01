@@ -1,7 +1,7 @@
 
 'use client';
 
-import type { Song, Playlist, UploadTask } from '@/lib/types';
+import type { Song, Playlist, UploadTask, RepeatMode } from '@/lib/types';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import React, {
   createContext,
@@ -51,6 +51,8 @@ interface MusicPlayerContextType {
   volume: number;
   activePlaylistId: string;
   isPlayerSheetOpen: boolean;
+  isShuffled: boolean;
+  repeatMode: RepeatMode;
   togglePlayerSheet: () => void;
   addSong: (source: File | string, userId: string) => string; // Returns taskId
   clearCompletedTasks: () => void;
@@ -68,6 +70,8 @@ interface MusicPlayerContextType {
   updateSong: (songId: string, updatedData: Partial<Song>) => Promise<void>;
   deleteSong: (songId: string) => Promise<void>;
   clearTask: (taskId: string) => void;
+  toggleShuffle: () => void;
+  toggleRepeatMode: () => void;
 }
 
 const MusicPlayerContext = createContext<MusicPlayerContextType | undefined>(
@@ -104,13 +108,19 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
   const [uploadTasks, setUploadTasks] = useState<UploadTask[]>([]);
   const [isPlayerSheetOpen, setIsPlayerSheetOpen] = useState(false);
 
+  // New state for shuffle and repeat
+  const [isShuffled, setIsShuffled] = useState(false);
+  const [shuffledIndices, setShuffledIndices] = useState<number[]>([]);
+  const [repeatMode, setRepeatMode] = useState<RepeatMode>('none');
+
+
   const songs = useMemo(() => songsData || [], [songsData]);
 
   const playlists: Playlist[] = useMemo(() => {
     const userPlaylists = playlistsData || [];
     const libraryPlaylist: Playlist = {
       id: 'library',
-      name: 'My Library',
+      name: 'All Songs',
       userId: user?.uid || 'anonymous',
       songIds: songs.map((s) => s.id),
       createdAt: serverTimestamp()
@@ -129,11 +139,6 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
       const playlist = playlists.find((p) => p.id === playlistId);
       if (!playlist) return [];
       
-      // For 'library' playlist, just return all songs
-      if (playlistId === 'library') {
-          return songs;
-      }
-      
       return playlist.songIds
         .map((songId) => songs.find((s) => s.id === songId))
         .filter(Boolean) as Song[];
@@ -141,44 +146,76 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
     [playlists, songs]
   );
 
-  const activePlaylistSongs = getPlaylistSongs(activePlaylistId);
+  const activePlaylistSongs = useMemo(() => getPlaylistSongs(activePlaylistId), [activePlaylistId, getPlaylistSongs]);
+  
+  useEffect(() => {
+    if (isShuffled) {
+        const indices = Array.from(Array(activePlaylistSongs.length).keys());
+        // Fisher-Yates shuffle
+        for (let i = indices.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [indices[i], indices[j]] = [indices[j], indices[i]];
+        }
+        setShuffledIndices(indices);
+    } else {
+        setShuffledIndices(Array.from(Array(activePlaylistSongs.length).keys()));
+    }
+  }, [isShuffled, activePlaylistSongs.length]);
+
+
   const currentTrack =
-    currentTrackIndexInPlaylist !== null
-      ? activePlaylistSongs[currentTrackIndexInPlaylist]
+    currentTrackIndexInPlaylist !== null && shuffledIndices.length > 0
+      ? activePlaylistSongs[shuffledIndices[currentTrackIndexInPlaylist]]
       : null;
+
 
   const playTrack = useCallback(
     (
-      trackIndexInPlaylist: number,
+      trackIndexInShuffledList: number,
       playlistId: string = activePlaylistId
     ) => {
       if (playlistId !== activePlaylistId) {
         setActivePlaylistId(playlistId);
       }
-      const targetPlaylistSongs = getPlaylistSongs(playlistId);
-      const track = targetPlaylistSongs[trackIndexInPlaylist];
+
+      // We always reference the shuffled list index now.
+      const actualIndexInPlaylist = shuffledIndices[trackIndexInShuffledList];
+      const track = activePlaylistSongs[actualIndexInPlaylist];
 
       if (track && audioRef.current) {
         if (track.fileUrl) {
           audioRef.current.src = track.fileUrl;
           audioRef.current.crossOrigin = 'anonymous';
         }
-        setCurrentTrackIndexInPlaylist(trackIndexInPlaylist);
+        setCurrentTrackIndexInPlaylist(trackIndexInShuffledList);
         audioRef.current
           .play()
           .then(() => setIsPlaying(true))
           .catch((e) => console.error('Playback failed', e));
       }
     },
-    [activePlaylistId, getPlaylistSongs]
+    [activePlaylistId, activePlaylistSongs, shuffledIndices]
   );
   
-  const playNext = useCallback(() => {
+   const playNext = useCallback(() => {
     if (currentTrackIndexInPlaylist === null) return;
-    const nextIndex =
-      (currentTrackIndexInPlaylist + 1) % activePlaylistSongs.length;
+    const nextIndex = (currentTrackIndexInPlaylist + 1) % shuffledIndices.length;
     playTrack(nextIndex, activePlaylistId);
-  }, [currentTrackIndexInPlaylist, activePlaylistSongs.length, activePlaylistId, playTrack]);
+  }, [currentTrackIndexInPlaylist, shuffledIndices.length, activePlaylistId, playTrack]);
+
+
+  const handleEnded = useCallback(() => {
+    if (repeatMode === 'one' && currentTrackIndexInPlaylist !== null) {
+      playTrack(currentTrackIndexInPlaylist, activePlaylistId);
+    } else if (repeatMode === 'all' || (repeatMode === 'none' && currentTrackIndexInPlaylist !== shuffledIndices.length -1) ) {
+      playNext();
+    } else {
+      // If repeat is 'none' and it's the last song, stop playback.
+      setIsPlaying(false);
+      if(audioRef.current) audioRef.current.currentTime = 0;
+    }
+  }, [repeatMode, playNext, playTrack, currentTrackIndexInPlaylist, activePlaylistId, shuffledIndices.length]);
+
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -186,7 +223,6 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
 
     const handleTimeUpdate = () => setCurrentTime(audio.currentTime);
     const handleLoadedMetadata = () => setDuration(audio.duration);
-    const handleEnded = () => playNext();
 
     audio.addEventListener('timeupdate', handleTimeUpdate);
     audio.addEventListener('loadedmetadata', handleLoadedMetadata);
@@ -197,7 +233,7 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
       audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
       audio.removeEventListener('ended', handleEnded);
     };
-  }, [playNext]);
+  }, [handleEnded]);
 
   const updateTaskProgress = (
     taskId: string,
@@ -404,8 +440,8 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
   const playPrevious = () => {
     if (currentTrackIndexInPlaylist === null) return;
     const prevIndex =
-      (currentTrackIndexInPlaylist - 1 + activePlaylistSongs.length) %
-      activePlaylistSongs.length;
+      (currentTrackIndexInPlaylist - 1 + shuffledIndices.length) %
+      shuffledIndices.length;
     playTrack(prevIndex, activePlaylistId);
   };
 
@@ -506,6 +542,16 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
     setIsPlayerSheetOpen(prev => !prev);
   }
 
+  const toggleShuffle = () => setIsShuffled(prev => !prev);
+
+  const toggleRepeatMode = () => {
+    setRepeatMode(prev => {
+        if (prev === 'none') return 'all';
+        if (prev === 'all') return 'one';
+        return 'none';
+    });
+  };
+
   return (
     <MusicPlayerContext.Provider
       value={{
@@ -520,6 +566,8 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
         volume,
         activePlaylistId,
         isPlayerSheetOpen,
+        isShuffled,
+        repeatMode,
         togglePlayerSheet,
         addSong,
         clearCompletedTasks,
@@ -537,6 +585,8 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
         updateSong,
         deleteSong,
         clearTask,
+        toggleShuffle,
+        toggleRepeatMode,
       }}
     >
       {children}
