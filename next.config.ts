@@ -49,12 +49,12 @@ const nextConfig: NextConfig = {
       bodySizeLimit: '100mb',
     },
   },
-  turbo: {
-    resolve: {
-        fallback: {
-            'react-native-fs': false,
-        }
-    }
+  webpack: (config, { isServer }) => {
+    config.resolve.fallback = {
+      ...config.resolve.fallback,
+      'react-native-fs': false,
+    };
+    return config;
   },
 };
 
