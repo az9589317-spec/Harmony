@@ -149,64 +149,86 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
   const activePlaylistSongs = useMemo(() => getPlaylistSongs(activePlaylistId), [activePlaylistId, getPlaylistSongs]);
   
   useEffect(() => {
-    if (isShuffled) {
-        const indices = Array.from(Array(activePlaylistSongs.length).keys());
-        // Fisher-Yates shuffle
-        for (let i = indices.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [indices[i], indices[j]] = [indices[j], indices[i]];
-        }
-        setShuffledIndices(indices);
-    } else {
-        setShuffledIndices(Array.from(Array(activePlaylistSongs.length).keys()));
+    const songCount = activePlaylistSongs.length;
+    if (songCount === 0) {
+      setShuffledIndices([]);
+      return;
     }
-  }, [isShuffled, activePlaylistSongs.length]);
+    
+    let indices = Array.from(Array(songCount).keys());
+
+    if (isShuffled) {
+      // Fisher-Yates shuffle
+      for (let i = indices.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [indices[i], indices[j]] = [indices[j], indices[i]];
+      }
+    }
+    
+    setShuffledIndices(indices);
+
+    // If a track is playing, find its new index in the shuffled/unshuffled list
+    if (currentTrackIndexInPlaylist !== null) {
+      const currentOriginalIndex = (shuffledIndices[currentTrackIndexInPlaylist] !== undefined) ? shuffledIndices[currentTrackIndexInPlaylist] : -1;
+      if(currentOriginalIndex !== -1) {
+        const newIndexInShuffledList = indices.indexOf(currentOriginalIndex);
+        if (newIndexInShuffledList !== -1) {
+          setCurrentTrackIndexInPlaylist(newIndexInShuffledList);
+        }
+      }
+    }
+  }, [isShuffled, activePlaylistId, songs, playlists]);
 
 
   const currentTrack =
-    currentTrackIndexInPlaylist !== null && shuffledIndices.length > 0
+    currentTrackIndexInPlaylist !== null && shuffledIndices[currentTrackIndexInPlaylist] !== undefined && activePlaylistSongs[shuffledIndices[currentTrackIndexInPlaylist]]
       ? activePlaylistSongs[shuffledIndices[currentTrackIndexInPlaylist]]
       : null;
 
 
   const playTrack = useCallback(
     (
-      trackIndexInShuffledList: number,
+      indexInOriginalPlaylist: number,
       playlistId: string = activePlaylistId
     ) => {
-      if (playlistId !== activePlaylistId) {
-        setActivePlaylistId(playlistId);
-      }
+      
+      const targetPlaylistSongs = getPlaylistSongs(playlistId);
 
-      // We always reference the shuffled list index now.
-      const actualIndexInPlaylist = shuffledIndices[trackIndexInShuffledList];
-      const track = activePlaylistSongs[actualIndexInPlaylist];
+      // Find the index in the current shuffled list that corresponds to the original index
+      const shuffledIndexToPlay = shuffledIndices.indexOf(indexInOriginalPlaylist);
+      const track = targetPlaylistSongs[indexInOriginalPlaylist];
 
       if (track && audioRef.current) {
+         if (playlistId !== activePlaylistId) {
+          setActivePlaylistId(playlistId);
+        }
         if (track.fileUrl) {
           audioRef.current.src = track.fileUrl;
           audioRef.current.crossOrigin = 'anonymous';
         }
-        setCurrentTrackIndexInPlaylist(trackIndexInShuffledList);
+        // Set the index of the *shuffled* list
+        setCurrentTrackIndexInPlaylist(shuffledIndexToPlay);
         audioRef.current
           .play()
           .then(() => setIsPlaying(true))
           .catch((e) => console.error('Playback failed', e));
       }
     },
-    [activePlaylistId, activePlaylistSongs, shuffledIndices]
+    [activePlaylistId, shuffledIndices, getPlaylistSongs]
   );
   
    const playNext = useCallback(() => {
-    if (currentTrackIndexInPlaylist === null) return;
-    const nextIndex = (currentTrackIndexInPlaylist + 1) % shuffledIndices.length;
-    playTrack(nextIndex, activePlaylistId);
-  }, [currentTrackIndexInPlaylist, shuffledIndices.length, activePlaylistId, playTrack]);
+    if (currentTrackIndexInPlaylist === null || shuffledIndices.length === 0) return;
+    const nextIndexInShuffledList = (currentTrackIndexInPlaylist + 1) % shuffledIndices.length;
+    const originalIndexToPlay = shuffledIndices[nextIndexInShuffledList];
+    playTrack(originalIndexToPlay, activePlaylistId);
+  }, [currentTrackIndexInPlaylist, shuffledIndices, activePlaylistId, playTrack]);
 
 
   const handleEnded = useCallback(() => {
     if (repeatMode === 'one' && currentTrackIndexInPlaylist !== null) {
-      playTrack(currentTrackIndexInPlaylist, activePlaylistId);
+      const originalIndexToPlay = shuffledIndices[currentTrackIndexInPlaylist];
+      playTrack(originalIndexToPlay, activePlaylistId);
     } else if (repeatMode === 'all' || (repeatMode === 'none' && currentTrackIndexInPlaylist !== shuffledIndices.length -1) ) {
       playNext();
     } else {
@@ -214,7 +236,7 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
       setIsPlaying(false);
       if(audioRef.current) audioRef.current.currentTime = 0;
     }
-  }, [repeatMode, playNext, playTrack, currentTrackIndexInPlaylist, activePlaylistId, shuffledIndices.length]);
+  }, [repeatMode, playNext, playTrack, currentTrackIndexInPlaylist, activePlaylistId, shuffledIndices]);
 
 
   useEffect(() => {
@@ -438,11 +460,11 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   const playPrevious = () => {
-    if (currentTrackIndexInPlaylist === null) return;
-    const prevIndex =
-      (currentTrackIndexInPlaylist - 1 + shuffledIndices.length) %
-      shuffledIndices.length;
-    playTrack(prevIndex, activePlaylistId);
+    if (currentTrackIndexInPlaylist === null || shuffledIndices.length === 0) return;
+    const prevIndexInShuffledList =
+      (currentTrackIndexInPlaylist - 1 + shuffledIndices.length) % shuffledIndices.length;
+    const originalIndexToPlay = shuffledIndices[prevIndexInShuffledList];
+    playTrack(originalIndexToPlay, activePlaylistId);
   };
 
   const seek = (time: number) => {
