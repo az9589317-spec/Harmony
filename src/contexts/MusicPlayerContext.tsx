@@ -148,11 +148,6 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
     return user ? [libraryPlaylist, ...userPlaylists] : [libraryPlaylist];
   }, [playlistsData, songs, user]);
   
-  const currentTrack =
-    currentTrackIndexInPlaylist !== null && shuffledIndices.length > 0 && activePlaylistSongs.length > 0 && shuffledIndices[currentTrackIndexInPlaylist] < activePlaylistSongs.length
-      ? activePlaylistSongs[shuffledIndices[currentTrackIndexInPlaylist]]
-      : null;
-
   const getPlaylistSongs = useCallback(
     (playlistId: string): Song[] => {
       if (playlistId.startsWith('user_')) {
@@ -172,6 +167,11 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const activePlaylistSongs = useMemo(() => getPlaylistSongs(activePlaylistId), [activePlaylistId, getPlaylistSongs]);
   
+  const currentTrack =
+    currentTrackIndexInPlaylist !== null && shuffledIndices.length > 0 && activePlaylistSongs.length > 0 && shuffledIndices[currentTrackIndexInPlaylist] < activePlaylistSongs.length
+      ? activePlaylistSongs[shuffledIndices[currentTrackIndexInPlaylist]]
+      : null;
+
   const playTrack = useCallback(
     (
       indexInOriginalPlaylist: number,
