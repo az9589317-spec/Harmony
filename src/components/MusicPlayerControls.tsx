@@ -4,9 +4,10 @@
 import { useMusicPlayer } from '@/contexts/MusicPlayerContext';
 import { Button } from './ui/button';
 import { Slider } from './ui/slider';
-import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Music, Shuffle, Repeat, Repeat1 } from 'lucide-react';
+import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Music, Shuffle, Repeat, Repeat1, Radio } from 'lucide-react';
 import { AlbumArt } from './AlbumArt';
 import { cn } from '@/lib/utils';
+import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from './ui/tooltip';
 
 
 function formatDuration(seconds: number) {
@@ -46,6 +47,7 @@ export function MusicPlayerControls() {
   const RepeatIcon = repeatMode === 'one' ? Repeat1 : Repeat;
 
   return (
+    <TooltipProvider>
     <footer className="h-20 bg-card border-t shrink-0 p-2 sm:p-4 flex items-center justify-between gap-4 z-10 shadow-inner">
       <div 
         className="flex items-center gap-3 w-1/3 cursor-pointer"
@@ -74,9 +76,15 @@ export function MusicPlayerControls() {
 
       <div className="flex-1 flex flex-col items-center justify-center gap-2">
         <div className="flex items-center gap-2">
-           <Button variant="ghost" size="icon" onClick={toggleShuffle} disabled={!currentTrack} className={cn("w-10 h-10 rounded-full hidden sm:inline-flex", isShuffled && "text-accent")}>
-            <Shuffle className="h-5 w-5" />
-          </Button>
+           <Tooltip>
+             <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" onClick={toggleShuffle} disabled={!currentTrack} className={cn("w-10 h-10 rounded-full hidden sm:inline-flex", isShuffled && "text-accent")}>
+                    <Shuffle className="h-5 w-5" />
+                </Button>
+             </TooltipTrigger>
+             <TooltipContent>Shuffle</TooltipContent>
+           </Tooltip>
+
           <Button variant="ghost" size="icon" onClick={playPrevious} disabled={!currentTrack} className="w-10 h-10 rounded-full">
             <SkipBack className="h-5 w-5" />
           </Button>
@@ -86,9 +94,15 @@ export function MusicPlayerControls() {
           <Button variant="ghost" size="icon" onClick={playNext} disabled={!currentTrack} className="w-10 h-10 rounded-full">
             <SkipForward className="h-5 w-5" />
           </Button>
-           <Button variant="ghost" size="icon" onClick={toggleRepeatMode} disabled={!currentTrack} className={cn("w-10 h-10 rounded-full hidden sm:inline-flex", repeatMode !== 'none' && "text-accent")}>
-            <RepeatIcon className="h-5 w-5" />
-          </Button>
+
+          <Tooltip>
+             <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" onClick={toggleRepeatMode} disabled={!currentTrack} className={cn("w-10 h-10 rounded-full hidden sm:inline-flex", repeatMode !== 'none' && "text-accent")}>
+                    <RepeatIcon className="h-5 w-5" />
+                </Button>
+            </TooltipTrigger>
+            <TooltipContent>Repeat: {repeatMode}</TooltipContent>
+           </Tooltip>
         </div>
         <div className="w-full hidden sm:flex items-center gap-2">
             <span className="text-xs text-muted-foreground w-10 text-right">{formatDuration(currentTime)}</span>
@@ -104,6 +118,14 @@ export function MusicPlayerControls() {
       </div>
       
       <div className="hidden md:flex items-center gap-2 w-1/3 justify-end">
+        <Tooltip>
+            <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" disabled={true} className="w-10 h-10 rounded-full hidden sm:inline-flex cursor-not-allowed">
+                    <Radio className="h-5 w-5" />
+                </Button>
+            </TooltipTrigger>
+            <TooltipContent>Autoplay (coming soon)</TooltipContent>
+        </Tooltip>
         <Button variant="ghost" size="icon" onClick={() => setVolume(volume > 0 ? 0 : 0.5)}>
             {volume === 0 ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
         </Button>
@@ -119,5 +141,6 @@ export function MusicPlayerControls() {
         {/* This div is to balance the flex layout on mobile, so the center controls are actually centered */}
       </div>
     </footer>
+    </TooltipProvider>
   );
 }

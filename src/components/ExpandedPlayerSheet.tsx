@@ -22,9 +22,11 @@ import {
   Shuffle,
   Repeat,
   Repeat1,
+  Radio
 } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
+import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from './ui/tooltip';
 
 
 function formatDuration(seconds: number) {
@@ -135,8 +137,19 @@ export function ExpandedPlayerSheet() {
                     </Button>
                 </div>
                 
-                {!isMobile && (
-                    <div className="flex items-center gap-2 pt-4">
+                <div className="flex items-center gap-2 pt-4">
+                    <TooltipProvider>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button variant="ghost" size="icon" disabled={true} className="hover:bg-white/20 cursor-not-allowed">
+                                <Radio className="h-5 w-5" />
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Autoplay (coming soon)</TooltipContent>
+                    </Tooltip>
+                    </TooltipProvider>
+
+                    <div className="flex-1 flex items-center gap-2">
                         <Button variant="ghost" size="icon" onClick={() => setVolume(volume > 0 ? 0 : 0.5)} className="hover:bg-white/20">
                             {volume === 0 ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
                         </Button>
@@ -148,7 +161,7 @@ export function ExpandedPlayerSheet() {
                             className='[&>span:first-child]:h-1'
                         />
                     </div>
-                )}
+                </div>
             </div>
         </div>
       </SheetContent>
