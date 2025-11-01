@@ -161,27 +161,7 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const activePlaylistSongs = useMemo(() => getPlaylistSongs(activePlaylistId), [activePlaylistId, getPlaylistSongs]);
   
-  const setupMediaSession = useCallback((track: Song) => {
-    if ('mediaSession' in navigator) {
-      navigator.mediaSession.metadata = new MediaMetadata({
-        title: track.title,
-        artist: track.artist,
-        album: 'Harmony Hub',
-        artwork: [
-          { src: track.albumArtUrl || '/icons/icon-192x192.png', sizes: '192x192', type: 'image/png' },
-          { src: track.albumArtUrl || '/icons/icon-512x512.png', sizes: '512x512', type: 'image/png' },
-        ]
-      });
-
-      // These are defined later, so we wrap them in functions
-      navigator.mediaSession.setActionHandler('play', () => togglePlayPause());
-      navigator.mediaSession.setActionHandler('pause', () => togglePlayPause());
-      navigator.mediaSession.setActionHandler('previoustrack', () => playPrevious());
-      navigator.mediaSession.setActionHandler('nexttrack', () => playNext());
-    }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  
-   const playTrack = useCallback(
+  const playTrack = useCallback(
     (
       indexInOriginalPlaylist: number,
       playlistId: string = activePlaylistId
@@ -207,15 +187,24 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
           .play()
           .then(() => {
               setIsPlaying(true);
-              setupMediaSession(track);
+              if ('mediaSession' in navigator) {
+                 navigator.mediaSession.metadata = new MediaMetadata({
+                    title: track.title,
+                    artist: track.artist,
+                    album: 'Harmony Hub',
+                    artwork: [
+                      { src: track.albumArtUrl || '/icons/icon-192x192.png', sizes: '192x192', type: 'image/png' },
+                      { src: track.albumArtUrl || '/icons/icon-512x512.png', sizes: '512x512', type: 'image/png' },
+                    ]
+                 });
+              }
           })
           .catch((e) => console.error('Playback failed', e));
       }
     },
-    [activePlaylistId, shuffledIndices, getPlaylistSongs, setupMediaSession]
+    [activePlaylistId, shuffledIndices, getPlaylistSongs]
   );
-  
-  // Define playNext and playPrevious before they are used in `handleEnded`
+
   const playNext = useCallback(() => {
     if (currentTrackIndexInPlaylist === null || shuffledIndices.length === 0) return;
     const nextIndexInShuffledList = (currentTrackIndexInPlaylist + 1);
@@ -243,6 +232,27 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
     playTrack(originalIndexToPlay, activePlaylistId);
   };
 
+  const togglePlayPause = () => {
+    if (!audioRef.current || !currentTrack) return;
+    if (isPlaying) {
+      audioRef.current.pause();
+      setIsPlaying(false);
+      if ('mediaSession' in navigator) {
+        navigator.mediaSession.playbackState = 'paused';
+      }
+    } else {
+      audioRef.current
+        .play()
+        .then(() => {
+          setIsPlaying(true);
+          if ('mediaSession' in navigator) {
+            navigator.mediaSession.playbackState = 'playing';
+          }
+        })
+        .catch((e) => console.error('Playback failed', e));
+    }
+  };
+
   const handleEnded = useCallback(() => {
     if (repeatMode === 'one' && currentTrackIndexInPlaylist !== null) {
       const originalIndexToPlay = shuffledIndices[currentTrackIndexInPlaylist];
@@ -252,6 +262,15 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   }, [repeatMode, playNext, playTrack, currentTrackIndexInPlaylist, activePlaylistId, shuffledIndices]);
 
+  useEffect(() => {
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.setActionHandler('play', () => togglePlayPause());
+      navigator.mediaSession.setActionHandler('pause', () => togglePlayPause());
+      navigator.mediaSession.setActionHandler('previoustrack', () => playPrevious());
+      navigator.mediaSession.setActionHandler('nexttrack', () => playNext());
+    }
+  }, [togglePlayPause, playPrevious, playNext]); // eslint-disable-line react-hooks/exhaustive-deps
+   
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -307,27 +326,6 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
     currentTrackIndexInPlaylist !== null && shuffledIndices.length > 0 && activePlaylistSongs.length > 0 && shuffledIndices[currentTrackIndexInPlaylist] < activePlaylistSongs.length
       ? activePlaylistSongs[shuffledIndices[currentTrackIndexInPlaylist]]
       : null;
-
-  const togglePlayPause = () => {
-    if (!audioRef.current || !currentTrack) return;
-    if (isPlaying) {
-      audioRef.current.pause();
-      setIsPlaying(false);
-      if ('mediaSession' in navigator) {
-        navigator.mediaSession.playbackState = 'paused';
-      }
-    } else {
-      audioRef.current
-        .play()
-        .then(() => {
-          setIsPlaying(true);
-          if ('mediaSession' in navigator) {
-            navigator.mediaSession.playbackState = 'playing';
-          }
-        })
-        .catch((e) => console.error('Playback failed', e));
-    }
-  };
 
   const updateTaskProgress = (
     taskId: string,
