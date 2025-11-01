@@ -62,7 +62,7 @@ export function HarmonyHubClient() {
           <Sidebar>
             <AppSidebar onSelectPlaylist={handleSelectPlaylist} />
           </Sidebar>
-          <SidebarInset className="relative flex flex-col overflow-hidden !m-0 !rounded-none !shadow-none bg-transparent">
+          <SidebarInset className="relative flex flex-col overflow-hidden !m-0 !rounded-none !shadow-none bg-card">
             <AppHeader onSearchChange={handleSearchChange} />
             <UploadProgressBar />
             {playlistName && (
