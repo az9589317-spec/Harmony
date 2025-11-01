@@ -34,6 +34,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { classifyMusicGenre } from '@/ai/flows/ai-classify-uploaded-music';
 import { uploadMedia } from '@/app/actions/upload';
 import { useToast } from '@/hooks/use-toast';
+import jsmediatags from 'jsmediatags';
+import type { TagType, PictureType } from 'jsmediatags/types';
 
 
 interface MusicPlayerContextType {
@@ -250,6 +252,15 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
     });
   };
 
+  const getTags = (file: File): Promise<TagType> => {
+    return new Promise((resolve, reject) => {
+      jsmediatags.read(file, {
+        onSuccess: (tag) => resolve(tag),
+        onError: (error) => reject(error),
+      });
+    });
+  };
+
   const addSong = (source: File | string, userId: string): string => {
     if (!userId || !firestore) return '';
 
@@ -286,24 +297,48 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
         
         updateTaskProgress(taskId, { progress: 100, status: 'processing' });
 
+        let title = fileName.replace(/\.[^/.]+$/, '').replace(/(\d{2}\s)?(.*?)\s?(\d{2,3}\s?Kbps)?/i, '$2').trim();
+        let artist = 'Unknown Artist';
+        let albumArtUrl = PlaceHolderImages[Math.floor(Math.random() * PlaceHolderImages.length)]
+        .imageUrl;
+        
+        let tags: TagType | null = null;
+        if (isFile) {
+          try {
+            tags = await getTags(source as File);
+            if (tags.tags.title) title = tags.tags.title;
+            if (tags.tags.artist) artist = tags.tags.artist;
+
+            const picture = tags.tags.picture as PictureType | undefined;
+            if (picture) {
+              const { data, format } = picture;
+              const artFile = new File([new Blob(data.map(c => String.fromCharCode(c)).join(''), { type: format })], 'album-art.jpg', { type: format });
+              const artFormData = new FormData();
+              artFormData.append('file', artFile);
+              const artUploadResult = await uploadMedia(artFormData, 'image');
+              if (artUploadResult.success && artUploadResult.url) {
+                albumArtUrl = artUploadResult.url;
+              }
+            }
+          } catch(e) {
+            console.warn("Could not read media tags from file.", e)
+          }
+        }
+
         const [genreResponse, duration] = await Promise.all([
           sourceToDataUri(fileToProcess).then(dataUri => classifyMusicGenre({ musicDataUri: dataUri })).catch(() => ({ genre: 'Unknown' })),
           getAudioDuration(fileToProcess),
         ]);
   
-        const randomAlbumArt =
-          PlaceHolderImages[Math.floor(Math.random() * PlaceHolderImages.length)]
-            .imageUrl;
-  
         const newSong: Song = {
           id: songId,
           userId: userId,
-          title: fileName.replace(/\.[^/.]+$/, ''),
-          artist: 'Unknown Artist',
+          title: title,
+          artist: artist,
           fileUrl: downloadURL,
           duration: duration,
           genre: genreResponse.genre || 'Unknown',
-          albumArtUrl: randomAlbumArt,
+          albumArtUrl: albumArtUrl,
           createdAt: serverTimestamp(),
         };
   
