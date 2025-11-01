@@ -17,22 +17,20 @@ import { AddSongsDialog } from './AddSongsDialog';
 import { useRouter } from 'next/navigation';
 
 export function HarmonyHubClient() {
-  const { getPlaylistSongs, activePlaylistId, setActivePlaylistId, isLoading } = useMusicPlayer();
+  const { getPlaylistSongs, activePlaylistId, setActivePlaylistId, isLoading, playlists, songs } = useMusicPlayer();
   const [searchTerm, setSearchTerm] = useState("");
   const [isAddSongsDialogOpen, setIsAddSongsDialogOpen] = useState(false);
   const router = useRouter();
 
 
   const activePlaylist = useMemo(() => {
-      const { playlists } = useMusicPlayer.getState();
       return playlists.find(p => p.id === activePlaylistId)
-  }, [activePlaylistId]);
+  }, [activePlaylistId, playlists]);
 
   const songsToDisplay = useMemo(() => {
     let currentSongs = getPlaylistSongs(activePlaylistId);
 
     if (searchTerm) {
-      const { songs } = useMusicPlayer.getState();
       return songs.filter(song =>
         song.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
         song.artist.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -40,7 +38,7 @@ export function HarmonyHubClient() {
       );
     }
     return currentSongs;
-  }, [activePlaylistId, getPlaylistSongs, searchTerm]);
+  }, [activePlaylistId, getPlaylistSongs, searchTerm, songs]);
   
   const handleSearchChange = (term: string) => {
     setSearchTerm(term);
