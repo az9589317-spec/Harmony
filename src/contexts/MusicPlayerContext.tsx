@@ -356,6 +356,10 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
           description: `"${newSong.title}" has been added.`,
         });
 
+        setTimeout(() => {
+            clearTask(taskId);
+        }, 3000); // Automatically remove after 3 seconds
+
       } catch (error) {
         console.error('Upload failed:', error);
         const errorMessage = error instanceof Error ? error.message : 'Unknown error during upload.';
