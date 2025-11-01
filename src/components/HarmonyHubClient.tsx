@@ -66,7 +66,7 @@ export function HarmonyHubClient() {
             <AppHeader onSearchChange={handleSearchChange} />
             <UploadProgressBar />
             <div className="flex-shrink-0">
-                {playlistName && (
+                {playlistName && activePlaylistId !== 'library' && (
                     <div className="flex justify-between items-center px-4 pt-4 md:px-6 bg-transparent">
                     <h1 className="text-xl sm:text-2xl font-bold tracking-tight">
                         {playlistName}

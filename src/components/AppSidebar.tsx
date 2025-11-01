@@ -55,6 +55,8 @@ export function AppSidebar({ onSelectPlaylist }: AppSidebarProps) {
       router.push(path);
   }
 
+  const isMusicActive = pathname === '/' && activePlaylistId === 'library';
+
   return (
     <div className="flex flex-col h-full p-2 md:p-4">
       <div className="flex items-center gap-2 mb-4 px-2 pt-4 md:mb-8">
@@ -66,12 +68,12 @@ export function AppSidebar({ onSelectPlaylist }: AppSidebarProps) {
 
       <nav className="flex flex-col gap-2 mb-4">
         <Button
-            variant={pathname === '/' ? 'secondary' : 'ghost'}
+            variant={isMusicActive ? 'secondary' : 'ghost'}
             className="justify-start gap-3 px-3 w-full"
-            onClick={() => handleNav('/')}
+            onClick={() => handleSelect('library')}
         >
-            <Music className="w-5 h-5" />
-            <span className="group-data-[collapsible=icon]:hidden">Music</span>
+            <ListMusic className="w-5 h-5" />
+            <span className="group-data-[collapsible=icon]:hidden">All Songs</span>
         </Button>
         <Button
             variant={pathname === '/community' ? 'secondary' : 'ghost'}
@@ -99,17 +101,6 @@ export function AppSidebar({ onSelectPlaylist }: AppSidebarProps) {
 
       {pathname === '/' && (
         <>
-          <div className="px-3 mb-2">
-             <Button
-                variant={activePlaylistId === 'library' ? 'secondary' : 'ghost'}
-                className="justify-start gap-3 px-3 w-full"
-                onClick={() => handleSelect('library')}
-                >
-                <ListMusic className="w-5 h-5 text-muted-foreground" />
-                <span className="group-data-[collapsible=icon]:hidden">My Library</span>
-            </Button>
-          </div>
-          
           {user && (
             <>
               <div className="flex items-center justify-between mb-2 px-3">
@@ -140,7 +131,7 @@ export function AppSidebar({ onSelectPlaylist }: AppSidebarProps) {
                         className="w-full justify-start gap-3 px-3 truncate"
                         onClick={() => handleSelect(playlist.id)}
                       >
-                        <ListMusic className="w-5 h-5 text-muted-foreground" />
+                        <Music className="w-5 h-5 text-muted-foreground" />
                         <span className="truncate group-data-[collapsible=icon]:hidden">
                           {playlist.name}
                         </span>
