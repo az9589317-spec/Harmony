@@ -121,6 +121,11 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const getPlaylistSongs = useCallback(
     (playlistId: string): Song[] => {
+      if (playlistId.startsWith('user_')) {
+        const userId = playlistId.replace('user_', '');
+        return songs.filter(s => s.userId === userId);
+      }
+
       const playlist = playlists.find((p) => p.id === playlistId);
       if (!playlist) return [];
       
