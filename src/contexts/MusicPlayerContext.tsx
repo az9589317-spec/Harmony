@@ -81,15 +81,21 @@ const MusicPlayerContext = createContext<MusicPlayerContextType | undefined>(
 
 // Helper to convert Google Drive links
 const convertGoogleDriveUrl = (url: string): string => {
-    if (url.includes('drive.google.com')) {
-        const match = url.match(/drive\.google\.com\/(?:file\/d\/|uc\?.*id=|open\?id=)([^/?&]+)/);
-        if (match && match[1]) {
-            const fileId = match[1];
-            return `https://drive.google.com/uc?export=download&id=${fileId}`;
-        }
+    if (!url.includes('drive.google.com')) return url;
+
+    // Regex to find the file ID in various Google Drive URL formats
+    const match = url.match(/drive\.google\.com\/(?:file\/d\/|uc\?.*id=)([^/?&]+)/);
+
+    if (match && match[1]) {
+        const fileId = match[1];
+        // Construct a direct download link
+        return `https://drive.google.com/uc?export=download&id=${fileId}`;
     }
+
+    // Return the original URL if no match is found, though it might not be playable
     return url;
 };
+
 
 export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
@@ -141,6 +147,11 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
     // If user is logged in, show their playlists, otherwise just show the library
     return user ? [libraryPlaylist, ...userPlaylists] : [libraryPlaylist];
   }, [playlistsData, songs, user]);
+  
+  const currentTrack =
+    currentTrackIndexInPlaylist !== null && shuffledIndices.length > 0 && activePlaylistSongs.length > 0 && shuffledIndices[currentTrackIndexInPlaylist] < activePlaylistSongs.length
+      ? activePlaylistSongs[shuffledIndices[currentTrackIndexInPlaylist]]
+      : null;
 
   const getPlaylistSongs = useCallback(
     (playlistId: string): Song[] => {
@@ -161,11 +172,6 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const activePlaylistSongs = useMemo(() => getPlaylistSongs(activePlaylistId), [activePlaylistId, getPlaylistSongs]);
   
-  const currentTrack =
-    currentTrackIndexInPlaylist !== null && shuffledIndices.length > 0 && activePlaylistSongs.length > 0 && shuffledIndices[currentTrackIndexInPlaylist] < activePlaylistSongs.length
-      ? activePlaylistSongs[shuffledIndices[currentTrackIndexInPlaylist]]
-      : null;
-
   const playTrack = useCallback(
     (
       indexInOriginalPlaylist: number,
@@ -198,6 +204,18 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
     },
     [activePlaylistId, shuffledIndices, getPlaylistSongs]
   );
+  
+  const togglePlayPause = () => {
+    if (!audioRef.current || !currentTrack) return;
+    if (isPlaying) {
+      audioRef.current.pause();
+      setIsPlaying(false);
+    } else {
+      audioRef.current
+        .play()
+        .catch((e) => console.error('Playback failed', e));
+    }
+  };
 
   const playNext = useCallback(() => {
     if (currentTrackIndexInPlaylist === null || shuffledIndices.length === 0) return;
@@ -223,19 +241,7 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
     const originalIndexToPlay = shuffledIndices[prevIndexInShuffledList];
     playTrack(originalIndexToPlay, activePlaylistId);
   }, [currentTrackIndexInPlaylist, shuffledIndices, activePlaylistId, playTrack]);
-
-  const togglePlayPause = () => {
-    if (!audioRef.current || !currentTrack) return;
-    if (isPlaying) {
-      audioRef.current.pause();
-      setIsPlaying(false);
-    } else {
-      audioRef.current
-        .play()
-        .catch((e) => console.error('Playback failed', e));
-    }
-  };
-
+  
   const handleEnded = useCallback(() => {
     if (repeatMode === 'one' && currentTrackIndexInPlaylist !== null) {
       const originalIndexToPlay = shuffledIndices[currentTrackIndexInPlaylist];
@@ -253,7 +259,7 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
       navigator.mediaSession.setActionHandler('previoustrack', playPrevious);
       navigator.mediaSession.setActionHandler('nexttrack', playNext);
     }
-  }, [togglePlayPause, playPrevious, playNext]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [togglePlayPause, playPrevious, playNext]);
 
   useEffect(() => {
     if ('mediaSession' in navigator && currentTrack) {
@@ -363,26 +369,13 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
     });
   };
   
-  const sourceToDataUri = (source: File | string) => {
+  const sourceToDataUri = (source: File | Buffer) => {
     return new Promise<string>(async (resolve, reject) => {
-      if (typeof source === 'string') {
-        try {
-           const response = await fetch(convertGoogleDriveUrl(source));
-           const blob = await response.blob();
-           const reader = new FileReader();
-           reader.onload = () => resolve(reader.result as string);
-           reader.onerror = reject;
-           reader.readAsDataURL(blob);
-        } catch (error) {
-          console.error("Failed to fetch from URL for AI classification due to CORS or other network issue.", error);
-          reject(error);
-        }
-      } else {
+        const blob = source instanceof Buffer ? new Blob([source]) : source;
         const reader = new FileReader();
         reader.onload = () => resolve(reader.result as string);
         reader.onerror = reject;
-        reader.readAsDataURL(source);
-      }
+        reader.readAsDataURL(blob);
     });
   };
 
@@ -414,24 +407,30 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
     const handleUploadAndSave = async () => {
       try {
         let downloadURL: string;
-        let fileToProcess: File | string = source;
+        let fileToProcess: File | Buffer;
+        let originalFileName: string;
 
+        const formData = new FormData();
         if (isFile) {
-            const formData = new FormData();
             formData.append('file', source as File);
-            updateTaskProgress(taskId, { progress: 50, status: 'uploading' });
-            const result = await uploadMedia(formData, 'audio');
-            if (!result.success || !result.url) {
-                throw new Error(result.error || 'Music upload failed on server');
-            }
-            downloadURL = result.url;
         } else {
-            downloadURL = convertGoogleDriveUrl(source as string);
+            formData.append('url', convertGoogleDriveUrl(source as string));
         }
-        
+
+        updateTaskProgress(taskId, { progress: 50, status: 'uploading' });
+
+        const result = await uploadMedia(formData, 'audio');
+
+        if (!result.success || !result.url || !result.buffer) {
+            throw new Error(result.error || 'Music upload failed on server');
+        }
+        downloadURL = result.url;
+        fileToProcess = result.buffer;
+        originalFileName = result.name;
+
         updateTaskProgress(taskId, { progress: 100, status: 'processing' });
 
-        let title = fileName.replace(/\.[^/.]+$/, '').replace(/(\d{2}\s)?(.*?)\s?(\d{2,3}\s?Kbps)?/i, '$2').trim();
+        let title = originalFileName.replace(/\.[^/.]+$/, '').replace(/(\d{2}\s)?(.*?)\s?(\d{2,3}\s?Kbps)?/i, '$2').trim();
         let artist = 'Unknown Artist';
         let albumArtUrl = PlaceHolderImages[Math.floor(Math.random() * PlaceHolderImages.length)]
         .imageUrl;
@@ -461,7 +460,7 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
 
         const [genreResponse, duration] = await Promise.all([
           sourceToDataUri(fileToProcess).then(dataUri => classifyMusicGenre({ musicDataUri: dataUri })).catch(() => ({ genre: 'Unknown' })),
-          getAudioDuration(fileToProcess),
+          getAudioDuration(downloadURL), // Get duration from the final URL
         ]);
   
         const newSong: Song = {
@@ -667,9 +666,3 @@ export const useMusicPlayer = () => {
   }
   return context;
 };
-
-    
-
-    
-
-    
