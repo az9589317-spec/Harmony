@@ -101,12 +101,10 @@ service cloud.firestore {
      */
     match /posts/{postId} {
       function isPostOwner() {
-        // For reads on an existing document
         return request.auth.uid == resource.data.userId;
       }
 
        function isNewPostOwner() {
-        // For a create operation
         return request.auth.uid == request.resource.data.userId;
       }
       
@@ -115,32 +113,52 @@ service cloud.firestore {
       }
 
       function unchanged(field) {
-        return incomingData()[field] == resource.data[field];
+          // If the field doesn't exist in incoming data, it's not being changed.
+          // If it exists in both, check if they are the same.
+          return !(field in incomingData()) || incomingData()[field] == resource.data[field];
+      }
+
+      function isLikingOrUnliking() {
+        // This operation is valid if the user is only changing the 'likes' array
+        // and nothing else.
+        return incomingData().keys().hasOnly(['likes'])
+                && unchanged('content')
+                && unchanged('userId')
+                && unchanged('username')
+                && unchanged('userImage')
+                && unchanged('createdAt')
+                && unchanged('commentCount')
+                && unchanged('imageUrl');
+      }
+
+      function isUpdatingCommentCount() {
+        // This operation is valid if only the comment count is changing.
+        return incomingData().keys().hasOnly(['commentCount'])
+                && unchanged('content')
+                && unchanged('userId')
+                && unchanged('username')
+                && unchanged('userImage')
+                && unchanged('createdAt')
+                && unchanged('likes')
+                && unchanged('imageUrl');
       }
 
       allow list, get: if true;
       allow create: if isSignedIn() 
                       && isNewPostOwner()
-                      && (incomingData().content.size() > 0 || incomingData().imageUrl.size() > 0)
+                      && (incomingData().content.size() > 0 || ('imageUrl' in incomingData() && incomingData().imageUrl.size() > 0))
                       && incomingData().content is string
                       && (!('imageUrl' in incomingData()) || (incomingData().imageUrl is string));
 
-      // Allow liking/unliking and comment count updates
       allow update: if isSignedIn() && (
-                      // Owner can edit their own post content/image
+                      // Case 1: The owner of the post is editing the content.
+                      // We don't need to check all fields because they have full edit rights,
+                      // except they cannot change likes or commentCount directly.
                       (isPostOwner() && unchanged('likes') && unchanged('commentCount')) ||
-                      // Any signed in user can like/unlike, but not change anything else
-                      (
-                        !isPostOwner() &&
-                        unchanged('content') &&
-                        unchanged('userId') &&
-                        unchanged('createdAt') &&
-                        unchanged('commentCount') &&
-                        (!('imageUrl' in resource.data) || unchanged('imageUrl')) &&
-                        request.resource.data.keys().hasAll(['userId', 'username', 'userImage', 'content', 'createdAt', 'likes', 'commentCount', 'imageUrl'])
-                      ) ||
-                      // Internal transaction to update comment count
-                      (request.resource.data.keys().hasOnly(['commentCount']) && unchanged('likes'))
+                      // Case 2: Any signed-in user is liking or unliking the post.
+                      (!isPostOwner() && isLikingOrUnliking()) ||
+                      // Case 3: A transaction is updating only the comment count.
+                      isUpdatingCommentCount()
                     );
 
 
