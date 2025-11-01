@@ -65,7 +65,7 @@ export function AppHeader({ onSearchChange }: AppHeaderProps) {
              <div className="flex items-center gap-2 md:hidden">
                 <Headphones className="w-6 h-6 text-accent" />
                  <h1 className="text-lg sm:text-xl font-bold tracking-tight font-headline">
-                    Harmony Hub
+                    H-HUB
                  </h1>
             </div>
         </div>
