@@ -14,11 +14,14 @@ import { UploadProgressBar } from './UploadProgressBar';
 import { Button } from './ui/button';
 import { Plus } from 'lucide-react';
 import { AddSongsDialog } from './AddSongsDialog';
+import { useRouter } from 'next/navigation';
 
 export function HarmonyHubClient() {
   const { songs, playlists, getPlaylistSongs, activePlaylistId, setActivePlaylistId } = useMusicPlayer();
   const [searchTerm, setSearchTerm] = useState("");
   const [isAddSongsDialogOpen, setIsAddSongsDialogOpen] = useState(false);
+  const router = useRouter();
+
 
   const activePlaylist = useMemo(() => playlists.find(p => p.id === activePlaylistId), [playlists, activePlaylistId]);
 
@@ -43,6 +46,7 @@ export function HarmonyHubClient() {
   const handleSelectPlaylist = (playlistId: string) => {
     setSearchTerm("");
     setActivePlaylistId(playlistId);
+    router.push('/');
   }
 
   const playlistName = useMemo(() => {
@@ -63,10 +67,10 @@ export function HarmonyHubClient() {
             <AppSidebar onSelectPlaylist={handleSelectPlaylist} />
           </Sidebar>
           <SidebarInset className="relative flex flex-col overflow-hidden !m-0 !rounded-none !shadow-none bg-card">
-            <AppHeader onSearchChange={handleSearchChange} />
+            <AppHeader onSearchChange={handleSearchChange} onGoHome={() => handleSelectPlaylist('library')} />
             <UploadProgressBar />
             <div className="flex-shrink-0">
-                {playlistName && activePlaylistId !== 'library' && (
+                {playlistName && (
                     <div className="flex justify-between items-center px-4 pt-4 md:px-6 bg-transparent">
                     <h1 className="text-xl sm:text-2xl font-bold tracking-tight">
                         {playlistName}

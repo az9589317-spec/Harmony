@@ -24,9 +24,10 @@ import { useIsMobile } from '@/hooks/use-mobile';
 
 interface AppHeaderProps {
   onSearchChange: (term: string) => void;
+  onGoHome: () => void;
 }
 
-export function AppHeader({ onSearchChange }: AppHeaderProps) {
+export function AppHeader({ onSearchChange, onGoHome }: AppHeaderProps) {
   const { user } = useUser();
   const auth = useAuth();
   const router = useRouter();
@@ -62,7 +63,7 @@ export function AppHeader({ onSearchChange }: AppHeaderProps) {
         </Button>
         
         <div className="flex items-center gap-2">
-             <div className="flex items-center gap-2 md:hidden">
+             <div onClick={onGoHome} className="flex items-center gap-2 md:hidden cursor-pointer">
                 <Headphones className="w-6 h-6 text-accent" />
                  <h1 className="text-lg sm:text-xl font-bold tracking-tight font-headline">
                     H-HUB
