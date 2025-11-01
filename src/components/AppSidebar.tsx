@@ -59,7 +59,7 @@ export function AppSidebar({ onSelectPlaylist }: AppSidebarProps) {
 
   return (
     <div className="flex flex-col h-full p-2 md:p-4">
-      <div className="flex items-center gap-2 mb-4 px-2 pt-4 md:mb-8">
+      <div onClick={() => handleSelect('library')} className="flex items-center gap-2 mb-4 px-2 pt-4 md:mb-8 cursor-pointer">
         <Headphones className="w-8 h-8 text-accent" />
         <h1 className="text-2xl font-bold text-foreground font-headline group-data-[collapsible=icon]:hidden">
           Harmony Hub
