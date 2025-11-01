@@ -114,6 +114,10 @@ service cloud.firestore {
         return request.resource.data;
       }
 
+      function unchanged(field) {
+        return incomingData()[field] == resource.data[field];
+      }
+
       allow list, get: if true;
       allow create: if isSignedIn() 
                       && isNewPostOwner()
@@ -123,13 +127,22 @@ service cloud.firestore {
 
       // Allow liking/unliking and comment count updates
       allow update: if isSignedIn() && (
-                      // Owner can edit content
-                      (isPostOwner() && request.resource.data.userId == resource.data.userId) ||
-                      // Any signed in user can like/unlike
-                      (request.resource.data.keys().hasOnly(['likes'])) ||
-                      // Updating comment count in transaction
-                       (request.resource.data.keys().hasOnly(['commentCount']))
+                      // Owner can edit their own post content/image
+                      (isPostOwner() && unchanged('likes') && unchanged('commentCount')) ||
+                      // Any signed in user can like/unlike, but not change anything else
+                      (
+                        !isPostOwner() &&
+                        unchanged('content') &&
+                        unchanged('userId') &&
+                        unchanged('createdAt') &&
+                        unchanged('commentCount') &&
+                        (!('imageUrl' in resource.data) || unchanged('imageUrl')) &&
+                        request.resource.data.keys().hasAll(['userId', 'username', 'userImage', 'content', 'createdAt', 'likes', 'commentCount', 'imageUrl'])
+                      ) ||
+                      // Internal transaction to update comment count
+                      (request.resource.data.keys().hasOnly(['commentCount']) && unchanged('likes'))
                     );
+
 
       allow delete: if isSignedIn() && isPostOwner();
 

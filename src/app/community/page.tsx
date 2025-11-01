@@ -70,13 +70,15 @@ function PostCard({ post }: { post: Post }) {
         const postRef = doc(firestore, 'posts', post.id);
 
         const operation = hasLiked ? arrayRemove : arrayUnion;
+        const updatedLikes = hasLiked ? postLikes.filter(uid => uid !== user.uid) : [...postLikes, user.uid];
+
         updateDoc(postRef, {
             likes: operation(user.uid)
         }).catch(serverError => {
              const permissionError = new FirestorePermissionError({
                 path: postRef.path,
                 operation: 'update',
-                requestResourceData: { likes: operation(user.uid) },
+                requestResourceData: { ...post, likes: updatedLikes },
             });
             errorEmitter.emit('permission-error', permissionError);
         });
@@ -328,6 +330,7 @@ export default function CommunityPage() {
             <AppHeader 
               playlistName="Community"
               onSearchChange={() => {}} // No search on this page
+              onGoHome={() => router.push('/')}
             />
             <ScrollArea className="flex-1">
                 <div className="p-4 md:p-6 space-y-6">
