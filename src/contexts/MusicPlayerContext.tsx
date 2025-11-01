@@ -82,7 +82,7 @@ const MusicPlayerContext = createContext<MusicPlayerContextType | undefined>(
 // Helper to convert Google Drive links
 const convertGoogleDriveUrl = (url: string): string => {
     if (url.includes('drive.google.com')) {
-        const match = url.match(/file\/d\/([^/]+)/);
+        const match = url.match(/drive\.google\.com\/(?:file\/d\/|uc\?.*id=|open\?id=)([^/?&]+)/);
         if (match && match[1]) {
             const fileId = match[1];
             return `https://drive.google.com/uc?export=download&id=${fileId}`;
@@ -161,12 +161,16 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const activePlaylistSongs = useMemo(() => getPlaylistSongs(activePlaylistId), [activePlaylistId, getPlaylistSongs]);
   
+  const currentTrack =
+    currentTrackIndexInPlaylist !== null && shuffledIndices.length > 0 && activePlaylistSongs.length > 0 && shuffledIndices[currentTrackIndexInPlaylist] < activePlaylistSongs.length
+      ? activePlaylistSongs[shuffledIndices[currentTrackIndexInPlaylist]]
+      : null;
+
   const playTrack = useCallback(
     (
       indexInOriginalPlaylist: number,
       playlistId: string = activePlaylistId
     ) => {
-      
       const targetPlaylistSongs = getPlaylistSongs(playlistId);
 
       // Find the index in the current shuffled list that corresponds to the original index
@@ -174,7 +178,7 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
       const track = targetPlaylistSongs[indexInOriginalPlaylist];
 
       if (track && audioRef.current) {
-         if (playlistId !== activePlaylistId) {
+        if (playlistId !== activePlaylistId) {
           setActivePlaylistId(playlistId);
         }
         if (track.fileUrl) {
@@ -186,18 +190,8 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
         audioRef.current
           .play()
           .then(() => {
-              setIsPlaying(true);
-              if ('mediaSession' in navigator) {
-                 navigator.mediaSession.metadata = new MediaMetadata({
-                    title: track.title,
-                    artist: track.artist,
-                    album: 'Harmony Hub',
-                    artwork: [
-                      { src: track.albumArtUrl || '/icons/icon-192x192.png', sizes: '192x192', type: 'image/png' },
-                      { src: track.albumArtUrl || '/icons/icon-512x512.png', sizes: '512x512', type: 'image/png' },
-                    ]
-                 });
-              }
+            setIsPlaying(true);
+            // Media Session setup is now in a separate effect
           })
           .catch((e) => console.error('Playback failed', e));
       }
@@ -209,13 +203,11 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
     if (currentTrackIndexInPlaylist === null || shuffledIndices.length === 0) return;
     const nextIndexInShuffledList = (currentTrackIndexInPlaylist + 1);
     
-    // Check for end of playlist based on repeat mode
     if (nextIndexInShuffledList >= shuffledIndices.length) {
       if (repeatMode === 'all') {
         const nextOriginalIndex = shuffledIndices[0];
         playTrack(nextOriginalIndex, activePlaylistId);
       } else {
-        // Stop playing or do nothing if not repeating
         setIsPlaying(false);
       }
     } else {
@@ -224,31 +216,22 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   }, [currentTrackIndexInPlaylist, shuffledIndices, activePlaylistId, playTrack, repeatMode]);
 
-  const playPrevious = () => {
+  const playPrevious = useCallback(() => {
     if (currentTrackIndexInPlaylist === null || shuffledIndices.length === 0) return;
     const prevIndexInShuffledList =
       (currentTrackIndexInPlaylist - 1 + shuffledIndices.length) % shuffledIndices.length;
     const originalIndexToPlay = shuffledIndices[prevIndexInShuffledList];
     playTrack(originalIndexToPlay, activePlaylistId);
-  };
+  }, [currentTrackIndexInPlaylist, shuffledIndices, activePlaylistId, playTrack]);
 
   const togglePlayPause = () => {
     if (!audioRef.current || !currentTrack) return;
     if (isPlaying) {
       audioRef.current.pause();
       setIsPlaying(false);
-      if ('mediaSession' in navigator) {
-        navigator.mediaSession.playbackState = 'paused';
-      }
     } else {
       audioRef.current
         .play()
-        .then(() => {
-          setIsPlaying(true);
-          if ('mediaSession' in navigator) {
-            navigator.mediaSession.playbackState = 'playing';
-          }
-        })
         .catch((e) => console.error('Playback failed', e));
     }
   };
@@ -262,15 +245,31 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   }, [repeatMode, playNext, playTrack, currentTrackIndexInPlaylist, activePlaylistId, shuffledIndices]);
 
+  // Separate effect for Media Session API
   useEffect(() => {
     if ('mediaSession' in navigator) {
-      navigator.mediaSession.setActionHandler('play', () => togglePlayPause());
-      navigator.mediaSession.setActionHandler('pause', () => togglePlayPause());
-      navigator.mediaSession.setActionHandler('previoustrack', () => playPrevious());
-      navigator.mediaSession.setActionHandler('nexttrack', () => playNext());
+      navigator.mediaSession.setActionHandler('play', togglePlayPause);
+      navigator.mediaSession.setActionHandler('pause', togglePlayPause);
+      navigator.mediaSession.setActionHandler('previoustrack', playPrevious);
+      navigator.mediaSession.setActionHandler('nexttrack', playNext);
     }
   }, [togglePlayPause, playPrevious, playNext]); // eslint-disable-line react-hooks/exhaustive-deps
-   
+
+  useEffect(() => {
+    if ('mediaSession' in navigator && currentTrack) {
+        navigator.mediaSession.metadata = new MediaMetadata({
+          title: currentTrack.title,
+          artist: currentTrack.artist,
+          album: 'Harmony Hub',
+          artwork: [
+            { src: currentTrack.albumArtUrl || '/icons/icon-192x192.png', sizes: '192x192', type: 'image/png' },
+            { src: currentTrack.albumArtUrl || '/icons/icon-512x512.png', sizes: '512x512', type: 'image/png' },
+          ]
+        });
+        navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
+    }
+  }, [currentTrack, isPlaying]);
+
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -320,12 +319,6 @@ export const MusicPlayerProvider: React.FC<{ children: React.ReactNode }> = ({
         setShuffledIndices(indices);
     }
   }, [isShuffled, activePlaylistId, playlists, activePlaylistSongs]); // Reworked dependencies
-
-
-  const currentTrack =
-    currentTrackIndexInPlaylist !== null && shuffledIndices.length > 0 && activePlaylistSongs.length > 0 && shuffledIndices[currentTrackIndexInPlaylist] < activePlaylistSongs.length
-      ? activePlaylistSongs[shuffledIndices[currentTrackIndexInPlaylist]]
-      : null;
 
   const updateTaskProgress = (
     taskId: string,
@@ -674,5 +667,9 @@ export const useMusicPlayer = () => {
   }
   return context;
 };
+
+    
+
+    
 
     
