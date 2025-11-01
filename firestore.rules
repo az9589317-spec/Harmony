@@ -113,34 +113,36 @@ service cloud.firestore {
       }
 
       function unchanged(field) {
-          // If the field doesn't exist in incoming data, it's not being changed.
-          // If it exists in both, check if they are the same.
-          return !(field in incomingData()) || incomingData()[field] == resource.data[field];
+        return incomingData()[field] == resource.data[field];
       }
-
+      
       function isLikingOrUnliking() {
-        // This operation is valid if the user is only changing the 'likes' array
-        // and nothing else.
-        return incomingData().keys().hasOnly(['likes'])
-                && unchanged('content')
-                && unchanged('userId')
-                && unchanged('username')
-                && unchanged('userImage')
-                && unchanged('createdAt')
-                && unchanged('commentCount')
-                && unchanged('imageUrl');
+        // This is a valid "like" or "unlike" operation if:
+        // 1. Only the 'likes' field is being changed. All other fields must be identical.
+        return request.resource.data.keys().hasOnly(['likes']) 
+                || (
+                    request.resource.data.keys().hasAll(['likes', 'commentCount', 'content', 'createdAt', 'userId', 'userImage', 'username']) 
+                    && unchanged('commentCount') 
+                    && unchanged('content') 
+                    && unchanged('createdAt') 
+                    && unchanged('userId') 
+                    && unchanged('userImage') 
+                    && unchanged('username')
+                );
       }
 
       function isUpdatingCommentCount() {
-        // This operation is valid if only the comment count is changing.
-        return incomingData().keys().hasOnly(['commentCount'])
-                && unchanged('content')
-                && unchanged('userId')
-                && unchanged('username')
-                && unchanged('userImage')
-                && unchanged('createdAt')
-                && unchanged('likes')
-                && unchanged('imageUrl');
+        // This is valid if only 'commentCount' is being changed.
+         return request.resource.data.keys().hasOnly(['commentCount']) 
+                || (
+                    request.resource.data.keys().hasAll(['likes', 'commentCount', 'content', 'createdAt', 'userId', 'userImage', 'username']) 
+                    && unchanged('likes') 
+                    && unchanged('content') 
+                    && unchanged('createdAt') 
+                    && unchanged('userId') 
+                    && unchanged('userImage') 
+                    && unchanged('username')
+                );
       }
 
       allow list, get: if true;
@@ -151,13 +153,11 @@ service cloud.firestore {
                       && (!('imageUrl' in incomingData()) || (incomingData().imageUrl is string));
 
       allow update: if isSignedIn() && (
-                      // Case 1: The owner of the post is editing the content.
-                      // We don't need to check all fields because they have full edit rights,
-                      // except they cannot change likes or commentCount directly.
+                      // Case 1: The owner of the post is editing it.
                       (isPostOwner() && unchanged('likes') && unchanged('commentCount')) ||
-                      // Case 2: Any signed-in user is liking or unliking the post.
-                      (!isPostOwner() && isLikingOrUnliking()) ||
-                      // Case 3: A transaction is updating only the comment count.
+                      // Case 2: Any signed-in user is only liking/unliking.
+                      isLikingOrUnliking() ||
+                      // Case 3: A transaction is only updating the comment count.
                       isUpdatingCommentCount()
                     );
 

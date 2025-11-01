@@ -69,16 +69,15 @@ function PostCard({ post }: { post: Post }) {
         }
         const postRef = doc(firestore, 'posts', post.id);
 
-        const operation = hasLiked ? arrayRemove : arrayUnion;
-        const updatedLikes = hasLiked ? postLikes.filter(uid => uid !== user.uid) : [...postLikes, user.uid];
-
+        const operation = hasLiked ? arrayRemove(user.uid) : arrayUnion(user.uid);
+        
         updateDoc(postRef, {
-            likes: operation(user.uid)
+            likes: operation
         }).catch(serverError => {
              const permissionError = new FirestorePermissionError({
                 path: postRef.path,
                 operation: 'update',
-                requestResourceData: { ...post, likes: updatedLikes },
+                requestResourceData: { likes: operation },
             });
             errorEmitter.emit('permission-error', permissionError);
         });
